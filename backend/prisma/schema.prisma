@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  groupId   String?
+  group     Group?   @relation(fields: [groupId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Group {
+  id         String     @id @default(uuid())
+  name       String
+  inviteCode String     @unique
+  members    User[]
+  doubtPdfs  DoubtPDF[]
+  createdAt  DateTime   @default(now())
+}
+
+model DoubtPDF {
+  id         String     @id @default(uuid())
+  className  String
+  subject    String
+  chapter    String
+  title      String
+  fileName   String
+  groupId    String?
+  group      Group?     @relation(fields: [groupId], references: [id])
+  pages      PDFPage[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model PDFPage {
+  id             String   @id @default(uuid())
+  doubtPdfId     String
+  doubtPdf       DoubtPDF @relation(fields: [doubtPdfId], references: [id], onDelete: Cascade)
+  orderIndex     Int
+  sourceFileRef  String?
+  sourcePageNum  Int?
+  addedBy        String?
+  addedAt        DateTime @default(now())
+}
+
+model DriveUpload {
+  id            String   @id @default(uuid())
+  className     String
+  subject       String
+  chapter       String
+  fileName      String
+  driveFileId   String
+  userName      String?
+  userEmail     String?
+  fileSizeBytes Int?
+  createdAt     DateTime @default(now())
+}

@@ -1,0 +1,25 @@
+# Secrets & Credentials
+*.json
+!.agents/**
+!backend/package.json
+!backend/tsconfig.json
+!jee_doubt_tracker/pubspec.json
+!jee_doubt_tracker/web/manifest.json
+.env
+
+# Dependencies & Build Outputs
+node_modules/
+dist/
+build/
+.dart_tool/
+.flutter-plugins*
+.idea/
+*.iml
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# User uploads & temp files
+uploads/*
+!uploads/.gitkeep
