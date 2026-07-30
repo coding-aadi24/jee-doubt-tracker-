@@ -2,6 +2,7 @@
 *.json
 !.agents/**
 !backend/package.json
+!backend/package-lock.json
 !backend/tsconfig.json
 !jee_doubt_tracker/pubspec.json
 !jee_doubt_tracker/web/manifest.json
