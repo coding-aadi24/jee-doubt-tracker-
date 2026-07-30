@@ -231,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             borderRadius: BorderRadius.circular(20),
                                           ),
                                           child: const Text(
-                                            'iOS Dark Glass Edition',
+                                            'JEE Doubt Vault',
                                             style: TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.bold,
@@ -351,9 +351,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                _buildStatItem('42', 'Unsolved Doubts', AppTheme.secondaryAccent),
-                                _buildStatItem('$_totalPdfCount', 'Chapter PDFs', AppTheme.primaryAccent),
-                                _buildStatItem('8', 'Active Peer Members', AppTheme.accentCyan),
+                                _buildStatItem('$_totalPdfCount', 'Uploaded PDFs', AppTheme.secondaryAccent),
+                                _buildStatItem('${_subjectPdfCounts.length}', 'Active Modules', AppTheme.primaryAccent),
+                                _buildStatItem('${_subjectCollections.length}', 'Subject Vaults', AppTheme.accentCyan),
                               ],
                             ),
                           ],

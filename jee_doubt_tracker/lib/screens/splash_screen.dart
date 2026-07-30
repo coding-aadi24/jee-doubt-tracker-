@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../theme/app_theme.dart';
+import '../config/api_config.dart';
 import 'home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -68,6 +70,15 @@ class _SplashScreenState extends State<SplashScreen>
     const stepMs = 50;
     final totalSteps = totalDurationMs ~/ stepMs;
     int currentStep = 0;
+
+    // Real backend connectivity check
+    http.get(Uri.parse(ApiConfig.uploadsUrl)).timeout(const Duration(seconds: 2)).then((res) {
+      if (res.statusCode == 200 && mounted) {
+        setState(() {
+          _statusMessages[2] = 'Backend connected & verified!';
+        });
+      }
+    }).catchError((_) {});
 
     _progressTimer = Timer.periodic(const Duration(milliseconds: stepMs), (timer) {
       currentStep++;

@@ -195,6 +195,10 @@ class _UploadScreenState extends State<UploadScreen> {
     if (newClass == null) return;
     setState(() {
       _selectedClass = newClass;
+      final availableSubjects = _chaptersByClassAndSubject[newClass]?.keys.toList() ?? ['Physics', 'Chemistry', 'Mathematics'];
+      if (!availableSubjects.contains(_selectedSubject)) {
+        _selectedSubject = availableSubjects.isNotEmpty ? availableSubjects.first : 'Physics';
+      }
       final chapters = _chaptersByClassAndSubject[newClass]?[_selectedSubject] ?? [];
       _selectedChapter = chapters.isNotEmpty ? chapters.first : null;
     });
@@ -279,6 +283,19 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 
+  Map<String, dynamic> _safeJsonDecode(String body) {
+    if (body.trim().isEmpty) return {};
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      return {'message': body};
+    } catch (_) {
+      return {'error': 'Server returned invalid response format: $body'};
+    }
+  }
+
   Future<void> _uploadFileToDriveBackend({bool forceAppend = false}) async {
     if (_selectedFile == null) {
       setState(() {
@@ -301,8 +318,7 @@ class _UploadScreenState extends State<UploadScreen> {
     });
 
     try {
-      final baseUrl = _serverUrlController.text.trim().replaceAll(RegExp(r'/$'), '');
-      final uri = Uri.parse('$baseUrl/api/v1/upload-to-drive');
+      final uri = Uri.parse(ApiConfig.uploadToDriveUrl);
 
       final request = http.MultipartRequest('POST', uri);
       request.fields['className'] = _selectedClass;
@@ -337,9 +353,9 @@ class _UploadScreenState extends State<UploadScreen> {
 
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
+      final responseData = _safeJsonDecode(response.body);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body);
         if (_selectedFile?.path != null) {
           ChapterPdfStore.registerChapterPdf(
             className: _selectedClass,
@@ -349,27 +365,25 @@ class _UploadScreenState extends State<UploadScreen> {
           );
         }
         setState(() {
-          _uploadResult = data;
+          _uploadResult = responseData;
           _isUploading = false;
         });
       } else if (response.statusCode == 409) {
-        final errorData = jsonDecode(response.body);
         setState(() {
           _isUploading = false;
         });
         if (mounted) {
-          _showPdfExistsDialog(context, errorData['message'] ?? 'Doubt PDF already exists for this chapter.');
+          _showPdfExistsDialog(context, responseData['message'] ?? 'Doubt PDF already exists for this chapter.');
         }
       } else {
-        final errorData = jsonDecode(response.body);
         setState(() {
-          _errorMessage = errorData['error'] ?? 'Upload failed with status ${response.statusCode}';
+          _errorMessage = responseData['error'] ?? responseData['message'] ?? 'Upload failed with status ${response.statusCode}';
           _isUploading = false;
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Connection error: $e. Ensure backend is running at ${_serverUrlController.text}';
+        _errorMessage = 'Connection error: $e. Ensure server is reachable at ${ApiConfig.baseUrl}';
         _isUploading = false;
       });
     }
@@ -386,7 +400,7 @@ class _UploadScreenState extends State<UploadScreen> {
         elevation: 0,
         centerTitle: true,
         title: const Text(
-          'Traffic Controller Upload',
+          'Upload Doubt PDF',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
         ),
       ),
@@ -525,7 +539,7 @@ class _UploadScreenState extends State<UploadScreen> {
                                   const SizedBox(height: 4),
                                   Text(
                                     _selectedFile != null
-                                        ? '${(_selectedFile!.size / (1024 * 1024)).toStringAsFixed(2)} MB'
+                                        ? '${((_selectedFile!.size > 0 ? _selectedFile!.size : (_selectedFile!.bytes?.length ?? 0)) / (1024 * 1024)).toStringAsFixed(2)} MB'
                                         : 'Supports PDF format up to 50MB',
                                     style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                                   ),
@@ -638,13 +652,13 @@ class _UploadScreenState extends State<UploadScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  pageNum != null ? 'Flag Page $pageNum for Doubt Bank' : 'Backend Traffic Controller',
+                  pageNum != null ? 'Flag Page $pageNum for Doubt Bank' : 'Doubt PDF Upload Engine',
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   pageNum != null
-                      ? 'Extracts Page $pageNum from source PDF & saves into Chapter Doubt PDF on Google Drive & PostgreSQL.'
+                      ? 'Sends Page $pageNum parameter to server engine to extract & append to Chapter Doubt PDF.'
                       : 'Upload PDF to Google Drive API & save returned File ID into PostgreSQL DB.',
                   style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                 ),

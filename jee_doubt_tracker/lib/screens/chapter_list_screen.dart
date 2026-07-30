@@ -475,7 +475,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                         itemCount: chapters.length,
                         itemBuilder: (context, index) {
                           final chapterTitle = chapters[index];
-                          final chapterIndex = index + 1;
+                          final realIdx = _allChapters.indexOf(chapterTitle);
+                          final chapterIndex = realIdx != -1 ? realIdx + 1 : index + 1;
                           final isAvailable = _isPdfAvailable(chapterTitle);
 
                           return Container(
@@ -496,7 +497,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                   }
 
                                   final serverDownloadUrl =
-                                      ApiConfig.downloadPdfUrl(chapter: chapterTitle);
+                                      foundPath ?? ApiConfig.downloadPdfUrl(chapter: chapterTitle);
 
                                   Navigator.push(
                                     context,

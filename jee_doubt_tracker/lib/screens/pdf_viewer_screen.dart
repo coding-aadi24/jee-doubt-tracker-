@@ -50,6 +50,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       _hasPdfContent = true;
 
       if (path.startsWith('http://') || path.startsWith('https://')) {
+        _isNetworkUrl = true;
         _startPdfDownloadFromUrl(path);
       } else if (File(path).existsSync()) {
         if (mounted) {
@@ -92,7 +93,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       } else {
         setState(() {
           _isDownloading = false;
-          _hasErrorLoadingPdf = true;
+          _isNetworkUrl = true;
+          _hasErrorLoadingPdf = false; // Fallback to SfPdfViewer.network direct stream
         });
       }
     }
@@ -224,6 +226,7 @@ startxref
                                 child: TextField(
                                   controller: _pageInputController,
                                   keyboardType: TextInputType.number,
+                                  maxLength: 4,
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     fontSize: 12,
@@ -232,6 +235,7 @@ startxref
                                   ),
                                   decoration: const InputDecoration(
                                     isDense: true,
+                                    counterText: '',
                                     contentPadding: EdgeInsets.zero,
                                     border: InputBorder.none,
                                   ),
@@ -241,6 +245,12 @@ startxref
                                       _pdfViewerController.jumpToPage(page);
                                     } else {
                                       _pageInputController.text = '$_currentPage';
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          duration: const Duration(seconds: 2),
+                                          content: Text('⚠️ Page number must be between 1 and $_totalPages'),
+                                        ),
+                                      );
                                     }
                                   },
                                 ),
@@ -489,6 +499,7 @@ startxref
     bool isUploading = false;
     List<String> existingChapters = [];
     bool isLoadingChapters = true;
+    bool isFetchingChapters = false;
 
     showModalBottomSheet(
       context: parentContext,
@@ -533,6 +544,7 @@ startxref
                         }
                       }
                       isLoadingChapters = false;
+                      isFetchingChapters = false;
                     });
                     return;
                   }
@@ -548,10 +560,12 @@ startxref
                   selectedChapter = 'Chapter 7: Alcohols, Phenols and Ethers';
                 }
                 isLoadingChapters = false;
+                isFetchingChapters = false;
               });
             }
 
-            if (isLoadingChapters) {
+            if (isLoadingChapters && !isFetchingChapters) {
+              isFetchingChapters = true;
               fetchChapters();
             }
 
@@ -847,6 +861,9 @@ startxref
                   setState(() {
                     _hasErrorLoadingPdf = false;
                     _isDownloading = false;
+                    _downloadedLocalPath = null;
+                    _isLocalFile = false;
+                    _isNetworkUrl = false;
                   });
                   _initPdfSource();
                 },
