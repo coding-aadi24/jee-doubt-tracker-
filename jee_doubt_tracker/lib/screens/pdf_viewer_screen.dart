@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../theme/app_theme.dart';
 import '../services/pdf_download_service.dart';
+import '../config/api_config.dart';
 import 'upload_screen.dart';
 
 class PdfViewerScreen extends StatefulWidget {
@@ -502,7 +503,7 @@ startxref
             void fetchChapters() async {
               try {
                 final response = await http
-                    .get(Uri.parse('http://localhost:5000/api/v1/uploads'))
+                    .get(Uri.parse(ApiConfig.uploadsUrl))
                     .timeout(const Duration(seconds: 3));
 
                 if (response.statusCode == 200) {
@@ -575,7 +576,7 @@ startxref
               });
 
               try {
-                final uri = Uri.parse('http://localhost:5000/api/v1/upload-to-drive');
+                final uri = Uri.parse(ApiConfig.uploadToDriveUrl);
                 final request = http.MultipartRequest('POST', uri);
 
                 request.files.add(await http.MultipartFile.fromPath('pdfFile', activeSourcePath));

@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import '../theme/app_theme.dart';
 import '../services/chapter_pdf_store.dart';
+import '../config/api_config.dart';
 
 class UploadScreen extends StatefulWidget {
   final String? initialFilePath;
@@ -39,7 +40,7 @@ class _UploadScreenState extends State<UploadScreen> {
   // User details
   final TextEditingController _userNameController = TextEditingController(text: 'JEE Aspirant');
   final TextEditingController _userEmailController = TextEditingController(text: 'aspirant@jee.edu');
-  final TextEditingController _serverUrlController = TextEditingController(text: 'http://localhost:5000');
+  final TextEditingController _serverUrlController = TextEditingController(text: ApiConfig.baseUrl);
 
   // UI state
   bool _isUploading = false;

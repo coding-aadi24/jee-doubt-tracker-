@@ -5,7 +5,7 @@ class ApiConfig {
   /// - Local PC Wi-Fi IP (e.g. 'http://192.168.1.15:5000')
   /// - Ngrok / Tunnel (e.g. 'https://xxxx.ngrok-free.app')
   /// - Production Cloud Server (e.g. 'https://jee-doubt-backend.onrender.com')
-  static String baseUrl = 'http://localhost:5000';
+  static String baseUrl = 'https://jee-doubt-tracker.onrender.com';
   
   /// Helper getter for uploads endpoint
   static String get uploadsUrl => '$baseUrl/api/v1/uploads';

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../theme/app_theme.dart';
 import '../services/chapter_pdf_store.dart';
+import '../config/api_config.dart';
 import 'pdf_viewer_screen.dart';
 import 'upload_screen.dart';
 
@@ -140,8 +141,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
 
     try {
       final response = await http
-          .get(Uri.parse('http://localhost:5000/api/v1/uploads'))
-          .timeout(const Duration(seconds: 3));
+          .get(Uri.parse(ApiConfig.uploadsUrl))
+          .timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -159,7 +160,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
               available.add(chapterStr);
               final fName = fileName?.toString() ?? '';
               final dId = driveId?.toString() ?? '';
-              paths[chapterStr] = 'http://localhost:5000/api/v1/download-pdf?fileName=${Uri.encodeComponent(fName)}&driveFileId=${Uri.encodeComponent(dId)}';
+              paths[chapterStr] = ApiConfig.downloadPdfUrl(fileName: fName, driveFileId: dId);
             }
           }
         }
@@ -495,7 +496,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                   }
 
                                   final serverDownloadUrl =
-                                      'http://localhost:5000/api/v1/download-pdf?chapter=${Uri.encodeComponent(chapterTitle)}';
+                                      ApiConfig.downloadPdfUrl(chapter: chapterTitle);
 
                                   Navigator.push(
                                     context,

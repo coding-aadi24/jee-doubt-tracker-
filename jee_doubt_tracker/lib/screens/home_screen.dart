@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import '../theme/app_theme.dart';
+import '../config/api_config.dart';
 import 'pdf_viewer_screen.dart';
 import 'upload_screen.dart';
 import 'chapter_list_screen.dart';
@@ -32,7 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final response = await http
-          .get(Uri.parse('http://localhost:5000/api/v1/uploads'))
+          .get(Uri.parse(ApiConfig.uploadsUrl))
           .timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {
