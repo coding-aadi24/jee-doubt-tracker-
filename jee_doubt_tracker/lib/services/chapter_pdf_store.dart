@@ -21,6 +21,15 @@ class ChapterPdfStore {
     return _chapterPdfPaths[key];
   }
 
+  static void removeChapterPdf({
+    required String className,
+    required String subject,
+    required String chapter,
+  }) {
+    final key = _makeKey(className, subject, chapter);
+    _chapterPdfPaths.remove(key);
+  }
+
   static bool hasPdf({
     required String className,
     required String subject,

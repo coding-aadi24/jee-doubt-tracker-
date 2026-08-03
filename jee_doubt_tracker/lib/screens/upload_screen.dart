@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import '../theme/app_theme.dart';
@@ -362,7 +363,7 @@ class _UploadScreenState extends State<UploadScreen> {
         request.fields['forceAppend'] = 'true';
       }
 
-      if (_selectedFile!.path != null) {
+      if (!kIsWeb && _selectedFile!.path != null) {
         final f = File(_selectedFile!.path!);
         if (!f.existsSync() || f.lengthSync() < 10) {
           throw Exception('Selected file is empty or inaccessible. Please select a valid PDF.');
@@ -392,12 +393,22 @@ class _UploadScreenState extends State<UploadScreen> {
       if (!mounted) return;
       if ((response.statusCode == 200 || response.statusCode == 201) && responseData['success'] == true) {
         if (_selectedFile?.path != null) {
-          ChapterPdfStore.registerChapterPdf(
-            className: _selectedClass,
-            subject: _selectedSubject,
-            chapter: _selectedChapter!,
-            filePath: _selectedFile!.path!,
-          );
+          if (!forceAppend) {
+            // New uploads: Cache locally for instant viewing
+            ChapterPdfStore.registerChapterPdf(
+              className: _selectedClass,
+              subject: _selectedSubject,
+              chapter: _selectedChapter!,
+              filePath: _selectedFile!.path!,
+            );
+          } else {
+            // Appended uploads: Remove any old cache so the app is forced to fetch the newly merged PDF from Google Drive!
+            ChapterPdfStore.removeChapterPdf(
+              className: _selectedClass,
+              subject: _selectedSubject,
+              chapter: _selectedChapter!,
+            );
+          }
         }
         setState(() {
           _uploadResult = responseData;
