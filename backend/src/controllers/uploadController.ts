@@ -63,6 +63,23 @@ export class UploadController {
         );
       }
 
+      // Verify the existing record actually still exists in Google Drive
+      if (existingRecord) {
+        try {
+          const driveFiles = await GoogleDriveService.listFiles();
+          const existsInDrive = driveFiles.some((df) => df.id === existingRecord.driveFileId || df.name === existingRecord.fileName);
+          
+          if (!existsInDrive && driveFiles.length > 0) {
+            // User manually deleted it from Google Drive!
+            // Clean up the ghost DB record and local file so they can upload fresh.
+            await prisma.driveUpload.delete({ where: { id: existingRecord.id } }).catch(() => {});
+            const oldLocalPath = path.join(config.storagePath, existingRecord.fileName);
+            await fs.unlink(oldLocalPath).catch(() => {});
+            existingRecord = null; // Proceed as a completely new upload
+          }
+        } catch (_) {}
+      }
+
       // If Doubt PDF already exists and forceAppend is not set -> Return 409 Conflict with popup prompt payload
       if (existingRecord && !isForceAppend) {
         await fs.unlink(file.path).catch(() => {});
