@@ -14,7 +14,7 @@ export class PdfService {
   ): Promise<void> {
     // Read source PDF
     const sourceBuffer = await fs.readFile(sourcePdfPath);
-    const sourcePdfDoc = await PDFDocument.load(sourceBuffer);
+    const sourcePdfDoc = await PDFDocument.load(sourceBuffer, { ignoreEncryption: true });
 
     const totalPages = sourcePdfDoc.getPageCount();
     if (sourcePageNumber < 1 || sourcePageNumber > totalPages) {
@@ -25,7 +25,7 @@ export class PdfService {
     let targetPdfDoc: PDFDocument;
     try {
       const targetBuffer = await fs.readFile(targetDoubtPdfPath);
-      targetPdfDoc = await PDFDocument.load(targetBuffer);
+      targetPdfDoc = await PDFDocument.load(targetBuffer, { ignoreEncryption: true });
     } catch {
       // Create new PDF if target file doesn't exist yet
       targetPdfDoc = await PDFDocument.create();

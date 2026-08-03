@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../theme/app_theme.dart';
 import '../services/chapter_pdf_store.dart';
 import '../config/api_config.dart';
+import '../widgets/glass_neumorphic_widgets.dart';
 import 'pdf_viewer_screen.dart';
 import 'upload_screen.dart';
 
@@ -14,6 +15,7 @@ class ChapterListScreen extends StatefulWidget {
   final String subjectName;  // e.g. "Physics"
   final Color accentColor;
   final IconData icon;
+  final String? heroTag;
 
   const ChapterListScreen({
     Key? key,
@@ -22,6 +24,7 @@ class ChapterListScreen extends StatefulWidget {
     required this.subjectName,
     required this.accentColor,
     required this.icon,
+    this.heroTag,
   }) : super(key: key);
 
   @override
@@ -29,12 +32,12 @@ class ChapterListScreen extends StatefulWidget {
 }
 
 class _ChapterListScreenState extends State<ChapterListScreen> {
+  final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
   Set<String> _availableChaptersInDb = {};
   Map<String, String> _chapterFilePaths = {};
-  bool _isLoadingDb = true;
 
   static const Map<String, Map<String, List<String>>> _chaptersDatabase = {
     'Class 11': {
@@ -135,6 +138,13 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     _fetchUploadedChaptersFromDatabase();
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchUploadedChaptersFromDatabase() async {
     final Set<String> available = {};
     final Map<String, String> paths = {};
@@ -142,7 +152,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     try {
       final response = await http
           .get(Uri.parse(ApiConfig.uploadsUrl))
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 60)); // 60s timeout for Render free tier cold start
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -165,15 +175,12 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
           }
         }
       }
-    } catch (_) {
-      // Backend unreachable or offline
-    }
+    } catch (_) {}
 
     if (mounted) {
       setState(() {
         _availableChaptersInDb = available;
         _chapterFilePaths = paths;
-        _isLoadingDb = false;
       });
     }
   }
@@ -204,40 +211,34 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         .toList();
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
   void _showNoPdfAvailableDialog(BuildContext context, String chapterTitle) {
     showDialog(
       context: context,
       builder: (context) {
         return Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-          child: _buildGlassContainer(
-            borderRadius: 24,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+          child: GlassNeumorphicCard(
+            borderRadius: 28,
             padding: const EdgeInsets.all(24),
+            borderColor: AppTheme.secondaryAccent.withOpacity(0.3),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
+                GlassCard(
+                  borderRadius: 20,
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppTheme.secondaryAccent.withOpacity(0.18),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppTheme.secondaryAccent.withOpacity(0.35)),
-                  ),
-                  child: const Icon(
+                  backgroundColor: AppTheme.secondaryAccent.withOpacity(0.18),
+                  borderColor: AppTheme.secondaryAccent.withOpacity(0.35),
+                  shadows: const [],
+                  child: Icon(
                     Icons.picture_as_pdf_outlined,
                     color: AppTheme.secondaryAccent,
-                    size: 36,
+                    size: 38,
                   ),
                 ),
                 const SizedBox(height: 18),
-                const Text(
+                Text(
                   'No PDF Available',
                   style: TextStyle(
                     fontSize: 20,
@@ -249,7 +250,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                 Text(
                   'No Doubt PDF has been uploaded for "$chapterTitle" in the database.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     color: AppTheme.textSecondary,
                     height: 1.4,
@@ -259,26 +260,21 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: TextButton(
+                      child: NeumorphicButton(
                         onPressed: () => Navigator.pop(context),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: BorderSide(color: AppTheme.glassBorder),
-                          ),
-                        ),
-                        child: const Text(
+                        surfaceColor: AppTheme.surfaceNeumorphic,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
                           'Cancel',
-                          style: TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w600),
+                          style: TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w600, fontSize: 13),
                         ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: ElevatedButton.icon(
+                      child: NeumorphicButton(
                         onPressed: () {
-                          Navigator.pop(context); // Close dialog
+                          Navigator.pop(context);
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -290,19 +286,19 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                             ),
                           ).then((_) => _fetchUploadedChaptersFromDatabase());
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryAccent,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        icon: const Icon(Icons.cloud_upload_rounded, size: 16),
-                        label: const Text(
-                          'Upload PDF',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        isGlowing: true,
+                        accentColor: AppTheme.primaryAccent,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.cloud_upload_rounded, size: 16, color: Colors.white),
+                            SizedBox(width: 6),
+                            Text(
+                              'Upload PDF',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -316,145 +312,96 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     );
   }
 
-  Widget _buildGlassContainer({
-    required Widget child,
-    double borderRadius = 20,
-    EdgeInsetsGeometry padding = const EdgeInsets.all(16),
-  }) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceGlassCard,
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(color: AppTheme.glassBorder, width: 1.2),
-            boxShadow: AppTheme.glassShadow,
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final chapters = _filteredChapters;
 
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundDark,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.backgroundGradient,
+    Widget headerContent = GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      borderRadius: 22,
+      child: Row(
+        children: [
+          NeumorphicIconButton(
+            icon: Icons.arrow_back_ios_new_rounded,
+            size: 38,
+            onPressed: () => Navigator.pop(context),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.subjectTitle,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                Text(
+                  '${_allChapters.length} Chapters in Module',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          GlassCard(
+            borderRadius: 14,
+            padding: const EdgeInsets.all(8),
+            backgroundColor: widget.accentColor.withOpacity(0.18),
+            borderColor: widget.accentColor.withOpacity(0.35),
+            shadows: const [],
+            child: Icon(widget.icon, color: widget.accentColor, size: 20),
+          ),
+        ],
+      ),
+    );
+
+    if (widget.heroTag != null) {
+      headerContent = Hero(
+        tag: widget.heroTag!,
+        child: Material(
+          color: Colors.transparent,
+          child: headerContent,
         ),
+      );
+    }
+
+    return Scaffold(
+      body: AmbientBackground(
+        scrollController: _scrollController,
         child: SafeArea(
           child: Column(
             children: [
-              // Top Custom Glass Bar
+              // Hero Target Navigation Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                child: Row(
-                  children: [
-                    InkWell(
-                      onTap: () => Navigator.pop(context),
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surfaceGlassCard,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppTheme.glassBorder),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: AppTheme.textPrimary,
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.subjectTitle,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textPrimary,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          Text(
-                            '${_allChapters.length} Chapters Available',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: widget.accentColor.withOpacity(0.18),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: widget.accentColor.withOpacity(0.3)),
-                      ),
-                      child: Icon(widget.icon, color: widget.accentColor, size: 20),
-                    ),
-                  ],
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: headerContent,
               ),
 
-              // Search Bar
+              // Debossed Neumorphic Search Bar
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-                child: TextField(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: NeumorphicTextField(
                   controller: _searchController,
-                  onChanged: (val) {
-                    setState(() {
-                      _searchQuery = val;
-                    });
+                  hintText: 'Search chapter by name...',
+                  prefixIcon: Icons.search_rounded,
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                  onClear: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
                   },
-                  style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'Search chapter name...',
-                    hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textSecondary, size: 20),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, color: AppTheme.textSecondary, size: 18),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _searchQuery = '';
-                              });
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: AppTheme.surfaceGlassCard,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: AppTheme.glassBorder, width: 1.2),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: widget.accentColor, width: 1.5),
-                    ),
-                  ),
                 ),
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
 
-              // Chapters List
+              // Chapters Soft UI Extruded List with Parallax Scroll & Staggered Entrance
               Expanded(
                 child: chapters.isEmpty
                     ? Center(
@@ -465,13 +412,14 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                             const SizedBox(height: 12),
                             Text(
                               'No chapters matching "$_searchQuery"',
-                              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                             ),
                           ],
                         ),
                       )
                     : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                         itemCount: chapters.length,
                         itemBuilder: (context, index) {
                           final chapterTitle = chapters[index];
@@ -479,59 +427,79 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                           final chapterIndex = realIdx != -1 ? realIdx + 1 : index + 1;
                           final isAvailable = _isPdfAvailable(chapterTitle);
 
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            child: InkWell(
-                              onTap: () {
-                                if (isAvailable) {
-                                  String? foundPath = _chapterFilePaths[chapterTitle];
-                                  if (foundPath == null) {
-                                    final normTitle = chapterTitle.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-                                    for (final entry in _chapterFilePaths.entries) {
-                                      final normKey = entry.key.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-                                      if (normKey == normTitle || normKey.contains(normTitle) || normTitle.contains(normKey)) {
-                                        foundPath = entry.value;
-                                        break;
+                          return StaggeredEntrance(
+                            index: index,
+                            baseDelayMs: 30,
+                            stepDelayMs: 40,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: NeumorphicCard(
+                                borderRadius: 20,
+                                padding: const EdgeInsets.all(14),
+                                accentBorderColor: isAvailable
+                                    ? widget.accentColor.withOpacity(0.25)
+                                    : Colors.white.withOpacity(0.08),
+                                onTap: () {
+                                  if (isAvailable) {
+                                    String? localStorePath = ChapterPdfStore.getChapterPdfPath(
+                                      className: widget.className,
+                                      subject: widget.subjectName,
+                                      chapter: chapterTitle,
+                                    );
+
+                                    String? foundPath = _chapterFilePaths[chapterTitle];
+                                    if (foundPath == null) {
+                                      final normTitle = chapterTitle.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+                                      for (final entry in _chapterFilePaths.entries) {
+                                        final normKey = entry.key.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+                                        if (normKey == normTitle || normKey.contains(normTitle) || normTitle.contains(normKey)) {
+                                          foundPath = entry.value;
+                                          break;
+                                        }
                                       }
                                     }
-                                  }
 
-                                  final serverDownloadUrl =
-                                      foundPath ?? ApiConfig.downloadPdfUrl(chapter: chapterTitle);
+                                    final targetFileUrlOrPath =
+                                        localStorePath ?? (foundPath ?? ApiConfig.downloadPdfUrl(chapter: chapterTitle));
 
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => PdfViewerScreen(
-                                        fileName: '$chapterTitle.pdf',
-                                        filePath: serverDownloadUrl,
+                                    Navigator.push(
+                                      context,
+                                      PageRouteBuilder(
+                                        transitionDuration: const Duration(milliseconds: 400),
+                                        pageBuilder: (context, animation, secondaryAnimation) => PdfViewerScreen(
+                                          fileName: '$chapterTitle.pdf',
+                                          filePath: targetFileUrlOrPath,
+                                        ),
+                                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                          return FadeTransition(
+                                            opacity: CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic),
+                                            child: child,
+                                          );
+                                        },
                                       ),
-                                    ),
-                                  );
-                                } else {
-                                  _showNoPdfAvailableDialog(context, chapterTitle);
-                                }
-                              },
-                              borderRadius: BorderRadius.circular(18),
-                              child: _buildGlassContainer(
-                                borderRadius: 18,
-                                padding: const EdgeInsets.all(14),
+                                    );
+                                  } else {
+                                    _showNoPdfAvailableDialog(context, chapterTitle);
+                                  }
+                                },
                                 child: Row(
                                   children: [
+                                    // Chapter Index Soft UI Pill
                                     Container(
-                                      width: 36,
-                                      height: 36,
+                                      width: 38,
+                                      height: 38,
                                       alignment: Alignment.center,
                                       decoration: BoxDecoration(
                                         color: isAvailable
-                                            ? widget.accentColor.withOpacity(0.15)
-                                            : Colors.white.withOpacity(0.06),
-                                        borderRadius: BorderRadius.circular(10),
+                                            ? widget.accentColor.withOpacity(0.18)
+                                            : const Color(0xFF14161E),
+                                        borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                           color: isAvailable
-                                              ? widget.accentColor.withOpacity(0.3)
-                                              : Colors.white.withOpacity(0.1),
+                                              ? widget.accentColor.withOpacity(0.35)
+                                              : Colors.white.withOpacity(0.08),
                                         ),
+                                        boxShadow: isAvailable ? [] : AppTheme.neumorphicPressedShadows(),
                                       ),
                                       child: Text(
                                         '#$chapterIndex',
@@ -543,42 +511,41 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                       ),
                                     ),
                                     const SizedBox(width: 14),
+
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             chapterTitle,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 14,
                                               fontWeight: FontWeight.w600,
                                               color: AppTheme.textPrimary,
                                               height: 1.3,
                                             ),
                                           ),
-                                          const SizedBox(height: 4),
+                                          const SizedBox(height: 6),
                                           Row(
                                             children: [
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: isAvailable
-                                                      ? const Color(0x3030D158)
-                                                      : Colors.white.withOpacity(0.08),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(
-                                                    color: isAvailable
-                                                        ? const Color(0xFF30D158).withOpacity(0.5)
-                                                        : Colors.white.withOpacity(0.12),
-                                                  ),
-                                                ),
+                                              GlassCard(
+                                                borderRadius: 8,
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                blur: 4,
+                                                backgroundColor: isAvailable
+                                                    ? AppTheme.accentEmerald.withOpacity(0.18)
+                                                    : Colors.white.withOpacity(0.06),
+                                                borderColor: isAvailable
+                                                    ? AppTheme.accentEmerald.withOpacity(0.4)
+                                                    : Colors.white.withOpacity(0.1),
+                                                shadows: const [],
                                                 child: Text(
-                                                  isAvailable ? 'PDF Available' : 'No PDF',
+                                                  isAvailable ? 'PDF Available' : 'No PDF Uploaded',
                                                   style: TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.bold,
                                                     color: isAvailable
-                                                        ? const Color(0xFF30D158)
+                                                        ? AppTheme.accentEmerald
                                                         : AppTheme.textMuted,
                                                   ),
                                                 ),
@@ -588,11 +555,12 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                         ],
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      icon: const Icon(Icons.cloud_upload_outlined, size: 20),
-                                      color: AppTheme.secondaryAccent,
-                                      tooltip: 'Upload doubt for this chapter',
+
+                                    NeumorphicIconButton(
+                                      icon: Icons.cloud_upload_outlined,
+                                      iconColor: AppTheme.secondaryAccent,
+                                      size: 36,
+                                      tooltip: 'Upload doubt PDF',
                                       onPressed: () {
                                         Navigator.push(
                                           context,
@@ -606,10 +574,11 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                         ).then((_) => _fetchUploadedChaptersFromDatabase());
                                       },
                                     ),
+                                    const SizedBox(width: 6),
                                     Icon(
                                       Icons.chevron_right_rounded,
-                                      color: AppTheme.textSecondary.withOpacity(0.7),
-                                      size: 22,
+                                      color: AppTheme.textMuted.withOpacity(0.7),
+                                      size: 20,
                                     ),
                                   ],
                                 ),

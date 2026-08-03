@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../theme/app_theme.dart';
 import '../config/api_config.dart';
+import '../widgets/glass_neumorphic_widgets.dart';
 import 'home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -71,7 +72,7 @@ class _SplashScreenState extends State<SplashScreen>
     final totalSteps = totalDurationMs ~/ stepMs;
     int currentStep = 0;
 
-    // Real backend connectivity check
+    // Backend connectivity check
     http.get(Uri.parse(ApiConfig.uploadsUrl)).timeout(const Duration(seconds: 2)).then((res) {
       if (res.statusCode == 200 && mounted) {
         setState(() {
@@ -81,6 +82,10 @@ class _SplashScreenState extends State<SplashScreen>
     }).catchError((_) {});
 
     _progressTimer = Timer.periodic(const Duration(milliseconds: stepMs), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       currentStep++;
       setState(() {
         _progressValue = (currentStep / totalSteps).clamp(0.0, 1.0);
@@ -96,6 +101,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _navigateToHome() {
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) => const HomeScreen(),
@@ -120,225 +126,207 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDark,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.backgroundGradient,
-        ),
-        child: Stack(
-          children: [
-            // Electric Blue & Warm Amber Ambient Glow Orbs
-            Positioned(
-              top: -size.height * 0.1,
-              right: -size.width * 0.15,
-              child: Container(
-                width: size.width * 0.75,
-                height: size.width * 0.75,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.primaryAccent.withOpacity(0.2),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -size.height * 0.1,
-              left: -size.width * 0.15,
-              child: Container(
-                width: size.width * 0.75,
-                height: size.width * 0.75,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.secondaryAccent.withOpacity(0.18),
-                ),
-              ),
-            ),
+      body: AmbientBackground(
+        child: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Spacer(),
 
-            // Main Centered Glass Content (#1C1C1E Surface)
-            SafeArea(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Spacer(),
-
-                      // Animated Logo Frame with #1C1C1E Glass Surface
-                      ScaleTransition(
-                        scale: _scaleAnimation,
-                        child: FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: AnimatedBuilder(
-                            animation: _auraPulseAnimation,
-                            builder: (context, child) {
-                              return Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Glow Aura
-                                  Container(
-                                    width: 160 * _auraPulseAnimation.value,
-                                    height: 160 * _auraPulseAnimation.value,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: AppTheme.primaryAccent.withOpacity(0.35),
-                                          blurRadius: 32,
-                                          spreadRadius: 6,
-                                        ),
-                                      ],
+                  // Animated Glass-Neumorphic Logo
+                  ScaleTransition(
+                    scale: _scaleAnimation,
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: AnimatedBuilder(
+                        animation: _auraPulseAnimation,
+                        builder: (context, child) {
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Pulsing Neumorphic Light Aura
+                              Container(
+                                width: 170 * _auraPulseAnimation.value,
+                                height: 170 * _auraPulseAnimation.value,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppTheme.primaryAccent.withOpacity(0.35),
+                                      blurRadius: 36,
+                                      spreadRadius: 8,
                                     ),
-                                  ),
+                                    BoxShadow(
+                                      color: AppTheme.secondaryAccent.withOpacity(0.20),
+                                      blurRadius: 42,
+                                      spreadRadius: 12,
+                                    ),
+                                  ],
+                                ),
+                              ),
 
-                                  // #1C1C1E Glass Icon Card
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(32),
-                                    child: BackdropFilter(
-                                      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                                      child: Container(
-                                        width: 140,
-                                        height: 140,
+                              // Frosted Glass Neumorphic Icon Container
+                              GlassNeumorphicCard(
+                                borderRadius: 36,
+                                padding: const EdgeInsets.all(22),
+                                borderColor: Colors.white.withOpacity(0.25),
+                                child: SizedBox(
+                                  width: 90,
+                                  height: 90,
+                                  child: Image.asset(
+                                    'assets/images/app_icon.png',
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
                                         decoration: BoxDecoration(
-                                          color: AppTheme.surfaceGlassCard,
-                                          borderRadius: BorderRadius.circular(32),
-                                          border: Border.all(
-                                            color: AppTheme.glassBorder,
-                                            width: 1.5,
+                                          shape: BoxShape.circle,
+                                          gradient: RadialGradient(
+                                            colors: [
+                                              AppTheme.primaryAccent.withOpacity(0.4),
+                                              AppTheme.secondaryAccent.withOpacity(0.15),
+                                            ],
                                           ),
-                                          boxShadow: AppTheme.glassShadow,
                                         ),
-                                        padding: const EdgeInsets.all(16),
-                                        child: Image.asset(
-                                          'assets/images/app_icon.png',
-                                          fit: BoxFit.contain,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return Container(
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                gradient: RadialGradient(
-                                                  colors: [
-                                                    AppTheme.primaryAccent.withOpacity(0.3),
-                                                    AppTheme.secondaryAccent.withOpacity(0.1),
-                                                  ],
-                                                ),
-                                              ),
-                                              child: const Icon(
-                                                Icons.auto_stories_rounded,
-                                                size: 56,
-                                                color: AppTheme.primaryAccent,
-                                              ),
-                                            );
-                                          },
+                                        child: Icon(
+                                          Icons.auto_stories_rounded,
+                                          size: 54,
+                                          color: AppTheme.primaryAccent,
                                         ),
-                                      ),
-                                    ),
+                                      );
+                                    },
                                   ),
-                                ],
-                              );
-                            },
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 36),
+
+                  // App Title & Subtitle Badge
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: Column(
+                      children: [
+                        Text(
+                          'JEE DOUBT VAULT',
+                          style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900,
+                            color: AppTheme.textPrimary,
+                            letterSpacing: 1.5,
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.15),
+                              width: 1.0,
+                            ),
+                          ),
+                          child: Text(
+                            'Collaborative PDF Question Organizer',
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                      const SizedBox(height: 32),
+                  const Spacer(),
 
-                      // App Title & Tagline (#F5F5F7 Text)
-                      FadeTransition(
-                        opacity: _fadeAnimation,
-                        child: Column(
+                  // Neumorphic Soft UI Progress Card
+                  NeumorphicCard(
+                    borderRadius: 24,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    surfaceColor: AppTheme.surfaceNeumorphic.withOpacity(0.85),
+                    distance: 6.0,
+                    blurRadius: 16.0,
+                    accentBorderColor: Colors.white.withOpacity(0.12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'JEE DOUBT VAULT',
-                              style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.textPrimary,
-                                letterSpacing: 1.2,
+                            Expanded(
+                              child: Text(
+                                _loadingStatus,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textPrimary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(height: 8),
                             Text(
-                              'Collaborative PDF Question Organizer',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppTheme.textSecondary,
+                              '${(_progressValue * 100).toInt()}%',
+                              style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryAccent,
                               ),
                             ),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 12),
 
-                      const Spacer(),
-
-                      // Glass Progress Container (#1C1C1E Surface)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                            decoration: BoxDecoration(
-                              color: AppTheme.surfaceGlassCard,
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: AppTheme.glassBorder),
-                              boxShadow: AppTheme.glassShadow,
-                            ),
-                            child: Column(
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        _loadingStatus,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppTheme.textPrimary,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
+                        // Debossed Inner Track for Progress Bar
+                        Container(
+                          height: 8,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF121319),
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: AppTheme.neumorphicPressedShadows(),
+                          ),
+                          child: Stack(
+                            children: [
+                              FractionallySizedBox(
+                                widthFactor: _progressValue,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    gradient: AppTheme.primaryGradient,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.primaryAccent.withOpacity(0.5),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
                                       ),
-                                    ),
-                                    Text(
-                                      '${(_progressValue * 100).toInt()}%',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.primaryAccent,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: LinearProgressIndicator(
-                                    value: _progressValue,
-                                    minHeight: 6,
-                                    backgroundColor: AppTheme.primaryAccent.withOpacity(0.15),
-                                    valueColor: const AlwaysStoppedAnimation<Color>(
-                                      AppTheme.primaryAccent,
-                                    ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-
-                      const SizedBox(height: 24),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+
+                  const SizedBox(height: 30),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

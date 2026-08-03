@@ -5,9 +5,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import '../theme/app_theme.dart';
 import '../config/api_config.dart';
+import '../widgets/glass_neumorphic_widgets.dart';
 import 'pdf_viewer_screen.dart';
 import 'upload_screen.dart';
 import 'chapter_list_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -17,6 +19,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final ScrollController _scrollController = ScrollController();
   String _selectedClassFilter = 'All'; // 'All', 'Class 11', 'Class 12'
   Map<String, int> _subjectPdfCounts = {};
   int _totalPdfCount = 0;
@@ -25,6 +28,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _fetchPdfCounts();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchPdfCounts() async {
@@ -73,11 +82,18 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!context.mounted) return;
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => PdfViewerScreen(
+          PageRouteBuilder(
+            transitionDuration: const Duration(milliseconds: 400),
+            pageBuilder: (context, animation, secondaryAnimation) => PdfViewerScreen(
               fileName: file.name,
               filePath: file.path,
             ),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(
+                opacity: CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic),
+                child: child,
+              );
+            },
           ),
         );
       }
@@ -95,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  final List<Map<String, dynamic>> _subjectCollections = const [
+  List<Map<String, dynamic>> get _subjectCollections => [
     {
       'class': 'Class 11',
       'title': 'Class 11 — Physics',
@@ -134,236 +150,264 @@ class _HomeScreenState extends State<HomeScreen> {
     },
   ];
 
-  Widget _buildFilterChip(String label) {
-    final isSelected = _selectedClassFilter == label;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedClassFilter = label;
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryAccent : AppTheme.surfaceGlassCard,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppTheme.primaryAccent : AppTheme.glassBorder,
-            width: 1.2,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppTheme.primaryAccent.withOpacity(0.35),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  )
-                ]
-              : [],
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? Colors.white : AppTheme.textSecondary,
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDark,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.backgroundGradient,
-        ),
+      body: AmbientBackground(
+        scrollController: _scrollController,
         child: SafeArea(
           child: Column(
             children: [
-              const SizedBox(height: 12),
+              // Floating Glass Header Bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: GlassCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  borderRadius: 22,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppTheme.primaryAccent.withOpacity(0.2),
+                              border: Border.all(color: AppTheme.primaryAccent.withOpacity(0.4)),
+                            ),
+                            child: Icon(
+                              Icons.auto_stories_rounded,
+                              color: AppTheme.primaryAccent,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'JEE Doubt Vault',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.textPrimary,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                              Text(
+                                'Collaborative Practice Hub',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      NeumorphicIconButton(
+                        icon: Icons.settings_rounded,
+                        size: 38,
+                        tooltip: 'Vault Settings',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            PageRouteBuilder(
+                              transitionDuration: const Duration(milliseconds: 350),
+                              pageBuilder: (context, animation, secondaryAnimation) => const SettingsScreen(),
+                              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                return SlideTransition(
+                                  position: Tween<Offset>(begin: const Offset(1.0, 0.0), end: Offset.zero).animate(
+                                    CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+                                  ),
+                                  child: child,
+                                );
+                              },
+                            ),
+                          ).then((_) => _fetchPdfCounts());
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
-              // Main Scrollable Body
+              // Main Scrollable Body with Parallax ScrollController
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+                  controller: _scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Primary Electric Blue & Warm Amber Hero Banner
-                      Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(28),
-                          gradient: AppTheme.primaryGradient,
-                          boxShadow: AppTheme.glassShadow,
-                        ),
-                        child: Stack(
-                          children: [
-                            Positioned(
-                              right: -20,
-                              bottom: -20,
-                              child: Container(
-                                width: 150,
-                                height: 150,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: AppTheme.secondaryAccent.withOpacity(0.25),
+                      // Hero Glass Banner with Neumorphic Action Buttons
+                      StaggeredEntrance(
+                        index: 0,
+                        child: GlassCard(
+                          borderRadius: 28,
+                          padding: const EdgeInsets.all(22.0),
+                          backgroundColor: Colors.white.withOpacity(0.06),
+                          child: Stack(
+                            children: [
+                              Positioned(
+                                right: -30,
+                                bottom: -30,
+                                child: Container(
+                                  width: 140,
+                                  height: 140,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: AppTheme.primaryAccent.withOpacity(0.18),
+                                  ),
                                 ),
                               ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(22.0),
-                              child: Row(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(0.2),
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                          child: const Text(
-                                            'JEE Doubt Vault',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 10),
-                                        const Text(
-                                          'Open & Read Practice Material',
-                                          style: TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                            letterSpacing: -0.5,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          'Flag unsolved question pages directly into your group doubt bank.',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.white.withOpacity(0.9),
-                                            height: 1.3,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 18),
-                                        Wrap(
-                                          spacing: 10,
-                                          runSpacing: 10,
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryAccent.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: AppTheme.primaryAccent.withOpacity(0.3)),
+                                    ),
+                                    child: Text(
+                                      'Doubt Organizer Engine',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.primaryAccent,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Open & Read Practice Material',
+                                    style: TextStyle(
+                                      fontSize: 21,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textPrimary,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Tag question numbers directly into your team doubt bank with automated cloud sync.',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppTheme.textSecondary,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  Wrap(
+                                    spacing: 12,
+                                    runSpacing: 10,
+                                    children: [
+                                      NeumorphicButton(
+                                        onPressed: () => _pickAndOpenPdf(context),
+                                        isGlowing: true,
+                                        accentColor: AppTheme.primaryAccent,
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            ElevatedButton.icon(
-                                              onPressed: () => _pickAndOpenPdf(context),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: Colors.white,
-                                                foregroundColor: AppTheme.primaryAccent,
-                                                elevation: 0,
-                                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(16),
-                                                ),
-                                              ),
-                                              icon: const Icon(Icons.picture_as_pdf, color: AppTheme.primaryAccent, size: 18),
-                                              label: const Text(
-                                                'Open PDF',
-                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                              ),
-                                            ),
-                                            ElevatedButton.icon(
-                                              onPressed: () {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) => const UploadScreen(),
-                                                  ),
-                                                ).then((_) => _fetchPdfCounts());
-                                              },
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: AppTheme.secondaryAccent,
-                                                foregroundColor: Colors.black,
-                                                elevation: 0,
-                                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(16),
-                                                ),
-                                              ),
-                                              icon: const Icon(Icons.cloud_upload_rounded, color: Colors.black, size: 18),
-                                              label: const Text(
-                                                'Upload to Drive',
-                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                              ),
+                                            Icon(Icons.picture_as_pdf, color: Colors.white, size: 18),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Open Local PDF',
+                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
                                             ),
                                           ],
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                      NeumorphicButton(
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            PageRouteBuilder(
+                                              transitionDuration: const Duration(milliseconds: 400),
+                                              pageBuilder: (context, animation, secondaryAnimation) => const UploadScreen(),
+                                              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                                return SlideTransition(
+                                                  position: Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+                                                    CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+                                                  ),
+                                                  child: FadeTransition(opacity: animation, child: child),
+                                                );
+                                              },
+                                            ),
+                                          ).then((_) => _fetchPdfCounts());
+                                        },
+                                        accentColor: AppTheme.secondaryAccent,
+                                        surfaceColor: AppTheme.surfaceNeumorphic,
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.cloud_upload_rounded, color: AppTheme.secondaryAccent, size: 18),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Upload to Drive',
+                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textPrimary),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 12),
-                                  Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.18),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white.withOpacity(0.3)),
-                                    ),
-                                    child: const Icon(
-                                      Icons.picture_as_pdf_rounded,
-                                      size: 42,
-                                      color: Colors.white,
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Neumorphic Stats Soft UI Card with Staggered Entrance
+                      StaggeredEntrance(
+                        index: 1,
+                        child: NeumorphicCard(
+                          borderRadius: 24,
+                          padding: const EdgeInsets.all(20),
+                          surfaceColor: AppTheme.surfaceNeumorphic,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.analytics_rounded, size: 16, color: AppTheme.primaryAccent),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Collaborative Library Metrics',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppTheme.textSecondary,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Dark Glass Stats Overview Container (#1C1C1E Surface)
-                      _buildGlassContainer(
-                        padding: const EdgeInsets.all(20),
-                        borderRadius: 24,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Collaborative Doubt Library',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: AppTheme.textSecondary,
-                                fontWeight: FontWeight.w600,
+                              const SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  _buildStatItem('$_totalPdfCount', 'Uploaded PDFs', AppTheme.secondaryAccent),
+                                  _buildStatItem('${_subjectPdfCounts.length}', 'Active Modules', AppTheme.primaryAccent),
+                                  _buildStatItem('${_subjectCollections.length}', 'Subject Vaults', AppTheme.accentCyan),
+                                ],
                               ),
-                            ),
-                            const SizedBox(height: 14),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                _buildStatItem('$_totalPdfCount', 'Uploaded PDFs', AppTheme.secondaryAccent),
-                                _buildStatItem('${_subjectPdfCounts.length}', 'Active Modules', AppTheme.primaryAccent),
-                                _buildStatItem('${_subjectCollections.length}', 'Subject Vaults', AppTheme.accentCyan),
-                              ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
 
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 26),
 
-                      // Section Title with Filter Chips
-                      const Text(
+                      // Section Title & Filter Chips
+                      Text(
                         'Browse Chapter Collections',
                         style: TextStyle(
                           fontSize: 19,
@@ -372,38 +416,56 @@ class _HomeScreenState extends State<HomeScreen> {
                           letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 12),
-
-                      // Filter Pills Row
-                      Row(
-                        children: [
-                          _buildFilterChip('All'),
-                          const SizedBox(width: 8),
-                          _buildFilterChip('Class 11'),
-                          const SizedBox(width: 8),
-                          _buildFilterChip('Class 12'),
-                        ],
-                      ),
                       const SizedBox(height: 14),
 
-                      // Glass Subject Cards (#1C1C1E Surface)
+                      // Neumorphic Class Filter Chips
+                      Row(
+                        children: [
+                          NeumorphicChip(
+                            label: 'All Subjects',
+                            isSelected: _selectedClassFilter == 'All',
+                            onTap: () => setState(() => _selectedClassFilter = 'All'),
+                          ),
+                          const SizedBox(width: 10),
+                          NeumorphicChip(
+                            label: 'Class 11',
+                            isSelected: _selectedClassFilter == 'Class 11',
+                            onTap: () => setState(() => _selectedClassFilter = 'Class 11'),
+                          ),
+                          const SizedBox(width: 10),
+                          NeumorphicChip(
+                            label: 'Class 12',
+                            isSelected: _selectedClassFilter == 'Class 12',
+                            onTap: () => setState(() => _selectedClassFilter = 'Class 12'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Neumorphic Subject Grid Cards with Hero Morphing & Staggered Animations
                       ..._subjectCollections
-                          .where((item) =>
+                          .asMap()
+                          .entries
+                          .where((entry) =>
                               _selectedClassFilter == 'All' ||
-                              item['class'] == _selectedClassFilter)
-                          .map((item) {
+                              entry.value['class'] == _selectedClassFilter)
+                          .map((entry) {
+                            final idx = entry.key;
+                            final item = entry.value;
                             final title = item['title'] as String;
                             final count = _subjectPdfCounts[title] ?? 0;
-                            final countLabel = count == 0 ? '0 Doubt PDFs' : '$count Doubt PDF${count > 1 ? 's' : ''}';
+                            final countLabel = count == 0 ? '0 PDFs' : '$count PDF${count > 1 ? 's' : ''}';
 
-                            return _buildGlassSubjectTile(
-                              context: context,
-                              title: title,
-                              subtitle: item['subtitle'] as String?,
-                              pdfCount: countLabel,
-                              color: item['color'] as Color,
-                              icon: item['icon'] as IconData,
-                              onReturn: _fetchPdfCounts,
+                            return StaggeredEntrance(
+                              index: idx + 2,
+                              child: _buildNeumorphicSubjectCard(
+                                context: context,
+                                title: title,
+                                pdfCount: countLabel,
+                                color: item['color'] as Color,
+                                icon: item['icon'] as IconData,
+                                onReturn: _fetchPdfCounts,
+                              ),
                             );
                           })
                           .toList(),
@@ -415,54 +477,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-        ),
-      ),
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.primaryAccent.withOpacity(0.4),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: FloatingActionButton.extended(
-          onPressed: () => _pickAndOpenPdf(context),
-          backgroundColor: AppTheme.primaryAccent,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          icon: const Icon(Icons.file_open_rounded, color: Colors.white),
-          label: const Text(
-            'Open PDF',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
-          ),
-        ),
-      ),
-    );
-  }
-
-  static Widget _buildGlassContainer({
-    required Widget child,
-    double borderRadius = 20,
-    EdgeInsetsGeometry padding = const EdgeInsets.all(16),
-  }) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceGlassCard,
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(color: AppTheme.glassBorder, width: 1.2),
-            boxShadow: AppTheme.glassShadow,
-          ),
-          child: child,
         ),
       ),
     );
@@ -483,7 +497,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 2),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w500,
             color: AppTheme.textSecondary,
@@ -493,90 +507,111 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  static Widget _buildGlassSubjectTile({
+  static Widget _buildNeumorphicSubjectCard({
     required BuildContext context,
     required String title,
-    String? subtitle,
     required String pdfCount,
     required Color color,
     required IconData icon,
     VoidCallback? onReturn,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      child: InkWell(
-        onTap: () {
-          final parts = title.split(' — ');
-          final className = parts.isNotEmpty ? parts[0].trim() : 'Class 12';
-          final subjectName = parts.length > 1 ? parts[1].trim() : 'Physics';
+    final heroTag = 'subject_hero_$title';
 
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChapterListScreen(
-                subjectTitle: title,
-                className: className,
-                subjectName: subjectName,
-                accentColor: color,
-                icon: icon,
-              ),
-            ),
-          ).then((_) => onReturn?.call());
-        },
-        borderRadius: BorderRadius.circular(20),
-        child: _buildGlassContainer(
-          borderRadius: 20,
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: color.withOpacity(0.25)),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Hero(
+        tag: heroTag,
+        child: Material(
+          color: Colors.transparent,
+          child: NeumorphicCard(
+            borderRadius: 22,
+            padding: const EdgeInsets.all(16),
+            accentBorderColor: Colors.white.withOpacity(0.08),
+            onTap: () {
+              final parts = title.split(' — ');
+              final className = parts.isNotEmpty ? parts[0].trim() : 'Class 12';
+              final subjectName = parts.length > 1 ? parts[1].trim() : 'Physics';
+
+              Navigator.push(
+                context,
+                PageRouteBuilder(
+                  transitionDuration: const Duration(milliseconds: 450),
+                  reverseTransitionDuration: const Duration(milliseconds: 350),
+                  pageBuilder: (context, animation, secondaryAnimation) => ChapterListScreen(
+                    subjectTitle: title,
+                    className: className,
+                    subjectName: subjectName,
+                    accentColor: color,
+                    icon: icon,
+                    heroTag: heroTag,
+                  ),
+                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(
+                      opacity: CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic),
+                      child: child,
+                    );
+                  },
                 ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
+              ).then((_) => onReturn?.call());
+            },
+            child: Row(
+              children: [
+                // Frosted Glass Icon Badge
+                GlassCard(
+                  borderRadius: 16,
+                  padding: const EdgeInsets.all(12),
+                  blur: 8,
+                  backgroundColor: color.withOpacity(0.15),
+                  borderColor: color.withOpacity(0.30),
+                  shadows: const [],
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
                       ),
-                    ),
-                    if (subtitle != null && subtitle.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        subtitle,
-                        style: const TextStyle(
+                        'Chapter Question Bank',
+                        style: TextStyle(
                           fontSize: 12,
                           color: AppTheme.textSecondary,
                         ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
+                // Soft UI Pill Count
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF14161E),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: color.withOpacity(0.3)),
+                    boxShadow: AppTheme.neumorphicPressedShadows(),
+                  ),
+                  child: Text(
+                    pdfCount,
+                    style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold),
+                  ),
                 ),
-                child: Text(
-                  pdfCount,
-                  style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold),
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppTheme.textMuted.withOpacity(0.7),
+                  size: 20,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../theme/app_theme.dart';
 import '../services/chapter_pdf_store.dart';
 import '../config/api_config.dart';
+import '../widgets/glass_neumorphic_widgets.dart';
 
 class UploadScreen extends StatefulWidget {
   final String? initialFilePath;
@@ -31,6 +32,8 @@ class UploadScreen extends StatefulWidget {
 }
 
 class _UploadScreenState extends State<UploadScreen> {
+  final ScrollController _scrollController = ScrollController();
+
   // Selections
   String _selectedClass = 'Class 12';
   String _selectedSubject = 'Physics';
@@ -184,6 +187,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _pageNumberController.dispose();
     _userNameController.dispose();
     _userEmailController.dispose();
@@ -237,48 +241,71 @@ class _UploadScreenState extends State<UploadScreen> {
     return showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surfaceDark,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: BorderSide(color: AppTheme.secondaryAccent.withOpacity(0.5), width: 1.5),
-        ),
-        title: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: AppTheme.secondaryAccent, size: 28),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Text(
-                'Doubt PDF Already Exists!',
-                style: TextStyle(color: AppTheme.textPrimary, fontSize: 17, fontWeight: FontWeight.bold),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: GlassNeumorphicCard(
+          borderRadius: 26,
+          padding: const EdgeInsets.all(22),
+          borderColor: AppTheme.secondaryAccent.withOpacity(0.4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.secondaryAccent.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.warning_amber_rounded, color: AppTheme.secondaryAccent, size: 26),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Doubt PDF Exists',
+                      style: TextStyle(color: AppTheme.textPrimary, fontSize: 17, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-        content: Text(
-          '$message\n\nWould you like to save this selected page into the existing Doubt PDF container on Google Drive & PostgreSQL database?',
-          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+              const SizedBox(height: 14),
+              Text(
+                '$message\n\nWould you like to save this selected page into the existing Doubt PDF container on Google Drive?',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  NeumorphicButton(
+                    onPressed: () => Navigator.pop(context),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: Text('Cancel', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                  ),
+                  const SizedBox(width: 10),
+                  NeumorphicButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _uploadFileToDriveBackend(forceAppend: true);
+                    },
+                    isGlowing: true,
+                    accentColor: AppTheme.secondaryAccent,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.bookmark_add_rounded, size: 16, color: Colors.black),
+                        SizedBox(width: 6),
+                        Text('Save Page', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              _uploadFileToDriveBackend(forceAppend: true);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.secondaryAccent,
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            icon: const Icon(Icons.bookmark_add_rounded, size: 18, color: Colors.black),
-            label: const Text('Save in Existing Doubt PDF', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -336,12 +363,19 @@ class _UploadScreenState extends State<UploadScreen> {
       }
 
       if (_selectedFile!.path != null) {
+        final f = File(_selectedFile!.path!);
+        if (!f.existsSync() || f.lengthSync() < 10) {
+          throw Exception('Selected file is empty or inaccessible. Please select a valid PDF.');
+        }
         request.files.add(await http.MultipartFile.fromPath(
           'pdfFile',
           _selectedFile!.path!,
           filename: _selectedFile!.name,
         ));
       } else if (_selectedFile!.bytes != null) {
+        if (_selectedFile!.bytes!.length < 10) {
+          throw Exception('Selected file data is empty. Please select a valid PDF.');
+        }
         request.files.add(http.MultipartFile.fromBytes(
           'pdfFile',
           _selectedFile!.bytes!,
@@ -355,7 +389,8 @@ class _UploadScreenState extends State<UploadScreen> {
       final response = await http.Response.fromStream(streamedResponse);
       final responseData = _safeJsonDecode(response.body);
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (!mounted) return;
+      if ((response.statusCode == 200 || response.statusCode == 201) && responseData['success'] == true) {
         if (_selectedFile?.path != null) {
           ChapterPdfStore.registerChapterPdf(
             className: _selectedClass,
@@ -372,9 +407,7 @@ class _UploadScreenState extends State<UploadScreen> {
         setState(() {
           _isUploading = false;
         });
-        if (mounted) {
-          _showPdfExistsDialog(context, responseData['message'] ?? 'Doubt PDF already exists for this chapter.');
-        }
+        _showPdfExistsDialog(context, responseData['message'] ?? 'Doubt PDF already exists for this chapter.');
       } else {
         setState(() {
           _errorMessage = responseData['error'] ?? responseData['message'] ?? 'Upload failed with status ${response.statusCode}';
@@ -382,6 +415,7 @@ class _UploadScreenState extends State<UploadScreen> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Connection error: $e. Ensure server is reachable at ${ApiConfig.baseUrl}';
         _isUploading = false;
@@ -394,231 +428,274 @@ class _UploadScreenState extends State<UploadScreen> {
     final availableChapters = _currentAvailableChapters;
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'Upload Doubt PDF',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-        ),
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.backgroundGradient,
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      body: AmbientBackground(
+        scrollController: _scrollController,
+        child: SafeArea(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header Card
-              _buildHeaderCard(),
-              const SizedBox(height: 20),
-
-              // Step 1: Select Taxonomy (Class -> Subject -> Chapter)
-              _buildSectionCard(
-                title: '1. Select Taxonomy',
-                icon: Icons.account_tree_rounded,
-                child: Column(
-                  children: [
-                    // Class Dropdown
-                    _buildDropdown(
-                      label: 'Class',
-                      value: _selectedClass,
-                      items: _classes,
-                      onChanged: _onClassChanged,
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Subject Dropdown
-                    _buildDropdown(
-                      label: 'Subject',
-                      value: _selectedSubject,
-                      items: const ['Physics', 'Chemistry', 'Mathematics'],
-                      onChanged: _onSubjectChanged,
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Chapter Dropdown
-                    _buildDropdown(
-                      label: 'Chapter Name',
-                      value: availableChapters.contains(_selectedChapter) ? _selectedChapter : availableChapters.firstOrNull,
-                      items: availableChapters,
-                      onChanged: (val) {
-                        if (val != null) setState(() => _selectedChapter = val);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              // Step 2: User Information
-              _buildSectionCard(
-                title: '2. User Information',
-                icon: Icons.person_rounded,
-                child: Column(
-                  children: [
-                    _buildTextField(
-                      controller: _userNameController,
-                      label: 'User Name',
-                      icon: Icons.badge_rounded,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildTextField(
-                      controller: _userEmailController,
-                      label: 'User Email',
-                      icon: Icons.email_rounded,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              // Step 3: Pick PDF & Server URL
-              _buildSectionCard(
-                title: '3. Choose PDF File',
-                icon: Icons.picture_as_pdf_rounded,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    InkWell(
-                      onTap: _pickPdfFile,
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: _selectedFile != null
-                              ? AppTheme.primaryAccent.withOpacity(0.12)
-                              : Colors.white.withOpacity(0.04),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: _selectedFile != null
-                                ? AppTheme.primaryAccent
-                                : AppTheme.glassBorder,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: _selectedFile != null
-                                    ? AppTheme.primaryAccent
-                                    : AppTheme.surfaceCard,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                _selectedFile != null ? Icons.check_circle_rounded : Icons.upload_file_rounded,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _selectedFile != null
-                                        ? _selectedFile!.name
-                                        : 'Tap to select PDF file',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: AppTheme.textPrimary,
-                                      fontWeight: _selectedFile != null ? FontWeight.bold : FontWeight.w500,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _selectedFile != null
-                                        ? '${((_selectedFile!.size > 0 ? _selectedFile!.size : (_selectedFile!.bytes?.length ?? 0)) / (1024 * 1024)).toStringAsFixed(2)} MB'
-                                        : 'Supports PDF format up to 50MB',
-                                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Icon(Icons.chevron_right_rounded, color: AppTheme.textSecondary),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    _buildTextField(
-                      controller: _pageNumberController,
-                      label: 'Page Number to Extract (Optional)',
-                      icon: Icons.find_in_page_rounded,
-                      keyboardType: TextInputType.number,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Error Banner
-              if (_errorMessage != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.redAccent.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
-                  ),
+              // Glass Top App Bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: GlassCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  borderRadius: 22,
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline_rounded, color: Colors.redAccent),
-                      const SizedBox(width: 12),
+                      NeumorphicIconButton(
+                        icon: Icons.arrow_back_ios_new_rounded,
+                        size: 38,
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                          'Upload Doubt PDF',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
+                            letterSpacing: -0.3,
+                          ),
                         ),
+                      ),
+                      GlassCard(
+                        borderRadius: 14,
+                        padding: const EdgeInsets.all(8),
+                        backgroundColor: AppTheme.primaryAccent.withOpacity(0.18),
+                        borderColor: AppTheme.primaryAccent.withOpacity(0.35),
+                        shadows: const [],
+                        child: Icon(Icons.cloud_upload_rounded, color: AppTheme.primaryAccent, size: 20),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
-              ],
-
-              // Upload Action Button
-              ElevatedButton.icon(
-                onPressed: _isUploading ? null : _uploadFileToDriveBackend,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryAccent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 6,
-                  shadowColor: AppTheme.primaryAccent.withOpacity(0.4),
-                ),
-                icon: _isUploading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
-                      )
-                    : const Icon(Icons.cloud_upload_rounded, size: 22),
-                label: Text(
-                  _isUploading ? 'Uploading via Traffic Controller...' : 'Upload to Google Drive & Save DB',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                ),
               ),
 
-              const SizedBox(height: 24),
+              // Main Form Body with Staggered Entrances
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Header Card
+                      StaggeredEntrance(
+                        index: 0,
+                        child: _buildHeaderCard(),
+                      ),
+                      const SizedBox(height: 18),
 
-              // Results Display / Success Card
-              if (_uploadResult != null) _buildSuccessCard(_uploadResult!),
+                      // Step 1: Select Taxonomy
+                      StaggeredEntrance(
+                        index: 1,
+                        child: _buildSectionCard(
+                          title: '1. Select Taxonomy',
+                          icon: Icons.account_tree_rounded,
+                          child: Column(
+                            children: [
+                              _buildDropdown(
+                                label: 'Class',
+                                value: _selectedClass,
+                                items: _classes,
+                                onChanged: _onClassChanged,
+                              ),
+                              const SizedBox(height: 14),
+                              _buildDropdown(
+                                label: 'Subject',
+                                value: _selectedSubject,
+                                items: const ['Physics', 'Chemistry', 'Mathematics'],
+                                onChanged: _onSubjectChanged,
+                              ),
+                              const SizedBox(height: 14),
+                              _buildDropdown(
+                                label: 'Chapter Name',
+                                value: availableChapters.contains(_selectedChapter) ? _selectedChapter : availableChapters.firstOrNull,
+                                items: availableChapters,
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _selectedChapter = val);
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
 
-              const SizedBox(height: 40),
+                      const SizedBox(height: 16),
+
+                      // Step 2: User Information
+                      StaggeredEntrance(
+                        index: 2,
+                        child: _buildSectionCard(
+                          title: '2. User Information',
+                          icon: Icons.person_rounded,
+                          child: Column(
+                            children: [
+                              _buildTextField(
+                                controller: _userNameController,
+                                label: 'User Name',
+                                icon: Icons.badge_rounded,
+                              ),
+                              const SizedBox(height: 12),
+                              _buildTextField(
+                                controller: _userEmailController,
+                                label: 'User Email',
+                                icon: Icons.email_rounded,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Step 3: Choose PDF File
+                      StaggeredEntrance(
+                        index: 3,
+                        child: _buildSectionCard(
+                          title: '3. Choose PDF File',
+                          icon: Icons.picture_as_pdf_rounded,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              GestureDetector(
+                                onTap: _pickPdfFile,
+                                child: NeumorphicCard(
+                                  borderRadius: 18,
+                                  padding: const EdgeInsets.all(16),
+                                  surfaceColor: _selectedFile != null
+                                      ? AppTheme.primaryAccent.withOpacity(0.12)
+                                      : AppTheme.surfaceNeumorphic,
+                                  accentBorderColor: _selectedFile != null
+                                      ? AppTheme.primaryAccent
+                                      : Colors.white.withOpacity(0.08),
+                                  child: Row(
+                                    children: [
+                                      GlassCard(
+                                        borderRadius: 14,
+                                        padding: const EdgeInsets.all(10),
+                                        backgroundColor: _selectedFile != null
+                                            ? AppTheme.primaryAccent
+                                            : AppTheme.surfaceNeumorphic,
+                                        shadows: const [],
+                                        child: Icon(
+                                          _selectedFile != null ? Icons.check_circle_rounded : Icons.upload_file_rounded,
+                                          color: Colors.white,
+                                          size: 22,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _selectedFile != null
+                                                  ? _selectedFile!.name
+                                                  : 'Tap to select PDF file',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: AppTheme.textPrimary,
+                                                fontWeight: _selectedFile != null ? FontWeight.bold : FontWeight.w500,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            SizedBox(height: 4),
+                                            Text(
+                                              _selectedFile != null
+                                                  ? '${((_selectedFile!.size > 0 ? _selectedFile!.size : (_selectedFile!.bytes?.length ?? 0)) / (1024 * 1024)).toStringAsFixed(2)} MB'
+                                                  : 'Supports PDF format up to 50MB',
+                                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Icon(Icons.chevron_right_rounded, color: AppTheme.textSecondary),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              _buildTextField(
+                                controller: _pageNumberController,
+                                label: 'Page Number to Extract (Optional)',
+                                icon: Icons.find_in_page_rounded,
+                                keyboardType: TextInputType.number,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Error Banner
+                      if (_errorMessage != null) ...[
+                        StaggeredEntrance(
+                          index: 4,
+                          child: GlassCard(
+                            borderRadius: 16,
+                            padding: const EdgeInsets.all(14),
+                            backgroundColor: Colors.redAccent.withOpacity(0.15),
+                            borderColor: Colors.redAccent.withOpacity(0.4),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline_rounded, color: Colors.redAccent),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    _errorMessage!,
+                                    style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Neumorphic Upload Action Button
+                      StaggeredEntrance(
+                        index: 5,
+                        child: NeumorphicButton(
+                          onPressed: _isUploading ? null : _uploadFileToDriveBackend,
+                          isGlowing: true,
+                          accentColor: AppTheme.primaryAccent,
+                          borderRadius: 22,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (_isUploading)
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                                )
+                              else
+                                const Icon(Icons.cloud_upload_rounded, size: 22, color: Colors.white),
+                              const SizedBox(width: 10),
+                              Text(
+                                _isUploading ? 'Uploading to Drive...' : 'Upload to Google Drive & Save DB',
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Success Result Card
+                      if (_uploadResult != null) _buildSuccessCard(_uploadResult!),
+
+                      const SizedBox(height: 30),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -628,23 +705,23 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Widget _buildHeaderCard() {
     final pageNum = widget.selectedPageNumber;
-    return Container(
+    return GlassNeumorphicCard(
+      borderRadius: 24,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceGlassCard,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.glassBlueBorder, width: 1.5),
-        boxShadow: AppTheme.glassShadow,
-      ),
+      borderColor: AppTheme.glassBlueBorder,
       child: Row(
         children: [
-          Container(
+          GlassCard(
+            borderRadius: 16,
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              gradient: pageNum != null ? AppTheme.secondaryGradient : AppTheme.primaryGradient,
-              borderRadius: BorderRadius.circular(14),
+            backgroundColor: pageNum != null ? AppTheme.secondaryAccent.withOpacity(0.2) : AppTheme.primaryAccent.withOpacity(0.2),
+            borderColor: pageNum != null ? AppTheme.secondaryAccent.withOpacity(0.4) : AppTheme.primaryAccent.withOpacity(0.4),
+            shadows: const [],
+            child: Icon(
+              pageNum != null ? Icons.bookmark_add_rounded : Icons.alt_route_rounded,
+              color: pageNum != null ? AppTheme.secondaryAccent : AppTheme.primaryAccent,
+              size: 26,
             ),
-            child: Icon(pageNum != null ? Icons.bookmark_add_rounded : Icons.alt_route_rounded, color: Colors.white, size: 28),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -653,14 +730,14 @@ class _UploadScreenState extends State<UploadScreen> {
               children: [
                 Text(
                   pageNum != null ? 'Flag Page $pageNum for Doubt Bank' : 'Doubt PDF Upload Engine',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   pageNum != null
                       ? 'Sends Page $pageNum parameter to server engine to extract & append to Chapter Doubt PDF.'
                       : 'Upload PDF to Google Drive API & save returned File ID into PostgreSQL DB.',
-                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.3),
                 ),
               ],
             ),
@@ -675,39 +752,30 @@ class _UploadScreenState extends State<UploadScreen> {
     required IconData icon,
     required Widget child,
   }) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceGlassCard,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.glassBorder, width: 1.2),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return NeumorphicCard(
+      borderRadius: 22,
+      padding: const EdgeInsets.all(18),
+      surfaceColor: AppTheme.surfaceNeumorphic,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Icon(icon, color: AppTheme.secondaryAccent, size: 20),
-                  const SizedBox(width: 10),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                ],
+              Icon(icon, color: AppTheme.secondaryAccent, size: 20),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
               ),
-              const SizedBox(height: 16),
-              child,
             ],
           ),
-        ),
+          const SizedBox(height: 16),
+          child,
+        ],
       ),
     );
   }
@@ -723,23 +791,24 @@ class _UploadScreenState extends State<UploadScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 6),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
           decoration: BoxDecoration(
-            color: AppTheme.surfaceDark,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.glassBorder),
+            color: const Color(0xFF14161E),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
+            boxShadow: AppTheme.neumorphicPressedShadows(),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: value,
               isExpanded: true,
-              dropdownColor: AppTheme.surfaceDark,
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.primaryAccent),
-              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+              dropdownColor: AppTheme.surfaceNeumorphic,
+              icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.primaryAccent),
+              style: TextStyle(color: AppTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
               items: items.map((item) {
                 return DropdownMenuItem<String>(
                   value: item,
@@ -765,27 +834,13 @@ class _UploadScreenState extends State<UploadScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 6),
-        TextField(
+        NeumorphicTextField(
           controller: controller,
-          keyboardType: keyboardType,
-          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
-          decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: AppTheme.primaryAccent, size: 20),
-            filled: true,
-            fillColor: AppTheme.surfaceDark,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppTheme.glassBorder),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppTheme.primaryAccent),
-            ),
-          ),
+          hintText: label,
+          prefixIcon: icon,
         ),
       ],
     );
@@ -795,33 +850,29 @@ class _UploadScreenState extends State<UploadScreen> {
     final data = result['data'] ?? {};
     final message = result['message'] ?? 'Doubt page saved successfully!';
 
-    return Container(
+    return GlassCard(
+      borderRadius: 24,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceGlassCard,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.greenAccent.withOpacity(0.5), width: 1.5),
-        boxShadow: AppTheme.glassShadow,
-      ),
+      backgroundColor: AppTheme.accentEmerald.withOpacity(0.12),
+      borderColor: AppTheme.accentEmerald.withOpacity(0.4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
+              GlassCard(
+                borderRadius: 14,
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.greenAccent.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 26),
+                backgroundColor: AppTheme.accentEmerald.withOpacity(0.2),
+                shadows: const [],
+                child: Icon(Icons.check_circle_rounded, color: AppTheme.accentEmerald, size: 26),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Doubt Saved Successfully!',
                       style: TextStyle(
                         fontSize: 16,
@@ -832,18 +883,16 @@ class _UploadScreenState extends State<UploadScreen> {
                     const SizedBox(height: 2),
                     Text(
                       message,
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-
           const SizedBox(height: 16),
-          Divider(color: AppTheme.glassBorder, height: 1),
+          Divider(color: Colors.white.withOpacity(0.12), height: 1),
           const SizedBox(height: 14),
-
           _buildResultDetailRow('Class', data['className']?.toString() ?? 'N/A'),
           _buildResultDetailRow('Subject', data['subject']?.toString() ?? 'N/A'),
           _buildResultDetailRow('Chapter', data['chapter']?.toString() ?? 'N/A'),
@@ -864,13 +913,13 @@ class _UploadScreenState extends State<UploadScreen> {
             width: 100,
             child: Text(
               '$label:',
-              style: const TextStyle(color: AppTheme.textMuted, fontSize: 12, fontWeight: FontWeight.w500),
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 12, fontWeight: FontWeight.w500),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(color: AppTheme.textPrimary, fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),
         ],

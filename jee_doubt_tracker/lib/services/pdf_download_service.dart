@@ -4,24 +4,33 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
+import 'package:flutter/foundation.dart';
+
 class PdfDownloadService {
   static Directory? _localFolder;
 
   /// Returns or creates the local JEE Doubt Tracker app folder for PDFs.
   static Future<Directory> getLocalPdfFolder() async {
+    if (kIsWeb) {
+      return Directory('/tmp/JEE_Doubt_Tracker_PDFs');
+    }
     if (_localFolder != null && _localFolder!.existsSync()) {
       return _localFolder!;
     }
 
-    final docsDir = await getApplicationDocumentsDirectory();
-    final pdfDir = Directory(path.join(docsDir.path, 'JEE_Doubt_Tracker_PDFs'));
+    try {
+      final docsDir = await getApplicationDocumentsDirectory();
+      final pdfDir = Directory(path.join(docsDir.path, 'JEE_Doubt_Tracker_PDFs'));
 
-    if (!pdfDir.existsSync()) {
-      await pdfDir.create(recursive: true);
+      if (!pdfDir.existsSync()) {
+        await pdfDir.create(recursive: true);
+      }
+
+      _localFolder = pdfDir;
+      return pdfDir;
+    } catch (_) {
+      return Directory('/tmp/JEE_Doubt_Tracker_PDFs');
     }
-
-    _localFolder = pdfDir;
-    return pdfDir;
   }
 
   /// Generates a clean local file path for a chapter PDF.

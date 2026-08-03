@@ -6,8 +6,8 @@ plugins {
 
 android {
     namespace = "com.jeedoubt.tracker.jee_doubt_tracker"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    compileSdk = 36
+    // ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

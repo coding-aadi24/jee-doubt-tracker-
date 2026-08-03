@@ -12,11 +12,16 @@ class JeeDoubtTrackerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'JEE Doubt Vault',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      home: const SplashScreen(),
+    return ValueListenableBuilder<AppThemeMode>(
+      valueListenable: AppTheme.activeThemeNotifier,
+      builder: (context, mode, child) {
+        return MaterialApp(
+          title: 'JEE Doubt Vault',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.darkTheme,
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }
