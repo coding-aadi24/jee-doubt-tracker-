@@ -273,29 +273,7 @@ export class UploadController {
       }
     } catch (_) {}
 
-    // 2. Scan local uploads folder for valid PDFs
-    try {
-      const files = await fs.readdir(config.storagePath);
-      for (const f of files) {
-        if (f.endsWith('.pdf') && !f.startsWith('.')) {
-          if (!list.some((r) => r.fileName === f)) {
-            const meta = UploadController.parseMetadataFromFileName(f);
-            list.push({
-              id: `local_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-              className: meta.className,
-              subject: meta.subject,
-              chapter: meta.chapter,
-              fileName: f,
-              driveFileId: '1wQtYgEwk_V8sCurxBeNuG_qobJXU4lBw',
-              userName: 'Local Storage',
-              userEmail: null,
-              fileSizeBytes: 128609,
-              createdAt: new Date().toISOString(),
-            });
-          }
-        }
-      }
-    } catch (_) {}
+    // 2. Local fallback scanning removed to prevent deleted Drive files from resurrecting
 
     return list;
   }
@@ -310,16 +288,33 @@ export class UploadController {
         orderBy: { createdAt: 'desc' },
       });
 
-      // Filter DB records to ensure only files that actually exist in Drive/local are returned
+      // Filter DB records to ensure only files that actually exist in Drive are returned (respecting manual deletions)
       if (dbRecords && dbRecords.length > 0) {
-        const driveFiles = await GoogleDriveService.listFiles().catch(() => []);
+        let driveFetchSuccess = true;
+        const driveFiles = await GoogleDriveService.listFiles().catch(() => {
+          driveFetchSuccess = false;
+          return [];
+        });
         const localFiles = await fs.readdir(config.storagePath).catch(() => []);
 
         const validDbRecords = dbRecords.filter((r) => {
           const existsInDrive = driveFiles.some((df) => df.id === r.driveFileId || df.name === r.fileName);
           const existsLocally = localFiles.some((lf) => lf === r.fileName);
-          return existsInDrive || existsLocally;
+          
+          if (driveFetchSuccess) {
+             // If Drive API worked, treat Google Drive as the absolute source of truth
+             return existsInDrive;
+          } else {
+             // Fallback if Drive API is down
+             return existsInDrive || existsLocally;
+          }
         });
+
+        if (driveFetchSuccess) {
+          // Drive API is the source of truth. Return the filtered list even if it is empty.
+          res.json({ success: true, count: validDbRecords.length, data: validDbRecords });
+          return;
+        }
 
         if (validDbRecords.length > 0) {
           res.json({ success: true, count: validDbRecords.length, data: validDbRecords });
@@ -328,6 +323,7 @@ export class UploadController {
       }
     } catch (_) {}
 
+    // Fallback only if the database is completely empty OR Drive API failed
     const combined = await UploadController.getCombinedUploadRecords();
     res.json({ success: true, count: combined.length, data: combined });
   }
