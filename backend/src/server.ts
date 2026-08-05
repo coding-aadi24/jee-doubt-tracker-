@@ -31,6 +31,11 @@ app.get('/', (req, res) => {
   });
 });
 
+// Common cron job ping endpoints
+app.get('/ping', (req, res) => res.status(200).send('pong'));
+app.get('/health', (req, res) => res.status(200).send('ok'));
+app.get('/api/ping', (req, res) => res.status(200).send('pong'));
+
 app.listen(config.port, () => {
   console.log(`🚀 EduSync Backend running on port ${config.port} (${config.nodeEnv})`);
   console.log(`📁 File Storage Location: ${config.storagePath}`);
