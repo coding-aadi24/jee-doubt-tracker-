@@ -1,9 +1,9 @@
 {
-    "name": "jee_doubt_tracker",
-    "short_name": "jee_doubt_tracker",
+    "name": "edu_sync",
+    "short_name": "edu_sync",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
+    "background_color": "#FFFFFF",
     "theme_color": "#0175C2",
     "description": "A new Flutter project.",
     "orientation": "portrait-primary",

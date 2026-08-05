@@ -3,13 +3,20 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../theme/app_theme.dart';
 import '../services/pdf_download_service.dart';
 import '../config/api_config.dart';
 import '../widgets/glass_neumorphic_widgets.dart';
+import '../services/drawing_engine.dart';
+import '../widgets/inking_canvas.dart';
+import '../models/drawing_models.dart';
 import 'upload_screen.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 class PdfViewerScreen extends StatefulWidget {
   final String fileName;
@@ -26,8 +33,8 @@ class PdfViewerScreen extends StatefulWidget {
 }
 
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
-  final PdfViewerController _pdfViewerController = PdfViewerController();
-  final TextEditingController _pageInputController = TextEditingController(text: '1');
+  late final PdfViewerController _pdfViewerController;
+  late final TextEditingController _pageInputController;
   int _currentPage = 1;
   int _totalPages = 1;
 
@@ -41,10 +48,27 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   bool _isModalOpen = false;
 
+  final DrawingEngine _drawingEngine = DrawingEngine();
+  Offset _currentScrollOffset = Offset.zero;
+  bool _isDrawMode = false;
+  // Unique key for reloading SfPdfViewer when native PDF is updated
+  Key _pdfViewerKey = UniqueKey();
+
   @override
   void initState() {
     super.initState();
+    _pdfViewerController = PdfViewerController();
+    _pdfViewerController.addListener(_onPdfScroll);
+    _pageInputController = TextEditingController(text: '1');
     _initPdfSource();
+  }
+
+  void _onPdfScroll() {
+    if (_currentScrollOffset != _pdfViewerController.scrollOffset) {
+      setState(() {
+        _currentScrollOffset = _pdfViewerController.scrollOffset;
+      });
+    }
   }
 
   Future<void> _initPdfSource() async {
@@ -55,14 +79,28 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       if (path.startsWith('http://') || path.startsWith('https://')) {
         _isNetworkUrl = true;
         _startPdfDownloadFromUrl(path);
-      } else if (File(path).existsSync()) {
-        if (mounted) {
-          setState(() {
-            _downloadedLocalPath = path;
-            _isLocalFile = true;
-          });
-        }
+      } else if (!kIsWeb && File(path).existsSync()) {
+        await _setupWorkingFile(File(path));
       }
+    }
+  }
+
+  Future<void> _setupWorkingFile(File originalFile) async {
+    final tempDir = await getTemporaryDirectory();
+    final workingFile = File('${tempDir.path}/working_${DateTime.now().millisecondsSinceEpoch}.pdf');
+    if (workingFile.existsSync()) {
+      workingFile.deleteSync();
+    }
+    await originalFile.copy(workingFile.path);
+
+    if (mounted) {
+      setState(() {
+        _downloadedLocalPath = workingFile.path;
+        _isLocalFile = true;
+        _isDownloading = false;
+        _hasErrorLoadingPdf = false;
+        _pdfViewerKey = UniqueKey();
+      });
     }
   }
 
@@ -87,12 +125,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
     if (mounted) {
       if (downloadedFile != null && downloadedFile.existsSync() && downloadedFile.lengthSync() > 1000) {
-        setState(() {
-          _downloadedLocalPath = downloadedFile.path;
-          _isLocalFile = true;
-          _isDownloading = false;
-          _hasErrorLoadingPdf = false;
-        });
+        await _setupWorkingFile(downloadedFile);
       } else {
         setState(() {
           _isDownloading = false;
@@ -105,16 +138,89 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   @override
   void dispose() {
+    _pdfViewerController.removeListener(_onPdfScroll);
     _pdfViewerController.dispose();
     _pageInputController.dispose();
+    _drawingEngine.dispose();
     super.dispose();
+  }
+
+  void _onPdfPageChanged(PdfPageChangedDetails details) {
+    _onPageChanged(details.newPageNumber);
   }
 
   void _onPageChanged(int newPage) {
     setState(() {
       _currentPage = newPage;
       _pageInputController.text = '$newPage';
+      _drawingEngine.setPage(newPage);
     });
+  }
+
+  void _goToPage(int page) {
+    if (page < 1 || page > _totalPages) return;
+    _pdfViewerController.jumpToPage(page);
+    _onPageChanged(page);
+  }
+
+  Future<void> _insertBlankPage() async {
+    if (_downloadedLocalPath == null) return;
+    
+    try {
+      final bytes = File(_downloadedLocalPath!).readAsBytesSync();
+      final document = PdfDocument(inputBytes: bytes);
+      
+      if (_currentPage < 1 || _currentPage > document.pages.count) return;
+
+      // Get size of current page
+      final currentPageObj = document.pages[_currentPage - 1]; // _currentPage is 1-indexed
+      final pageSize = currentPageObj.size;
+      
+      // Remove default margins so the background color fills the entire page
+      document.pageSettings.margins.all = 0;
+      
+      // Insert a new blank page at _currentPage index (which puts it right after the current page, since it's 0-indexed)
+      final newPage = document.pages.insert(_currentPage, pageSize);
+      
+      // Draw a dark rectangle as fallback background
+      newPage.graphics.drawRectangle(
+        brush: PdfSolidBrush(PdfColor(28, 25, 23)), // AppTheme.backgroundDark equivalent
+        bounds: Rect.fromLTWH(0, 0, pageSize.width, pageSize.height),
+      );
+      
+      // Try drawing the branded logo image over the background
+      try {
+        final ByteData data = await rootBundle.load('assets/images/branded_page_bg.png');
+        final Uint8List imageBytes = data.buffer.asUint8List();
+        final PdfBitmap image = PdfBitmap(imageBytes);
+        
+        newPage.graphics.drawImage(
+          image,
+          Rect.fromLTWH(0, 0, pageSize.width, pageSize.height),
+        );
+      } catch (imageError) {
+        debugPrint("Error drawing branded background image: $imageError");
+      }
+      
+      // Save and overwrite the working file
+      final savedBytes = await document.save();
+      File(_downloadedLocalPath!).writeAsBytesSync(savedBytes);
+      document.dispose();
+      
+      // Reload UI
+      if (mounted) {
+        setState(() {
+          _totalPages++;
+          _pdfViewerKey = UniqueKey(); // Force SfPdfViewer to rebuild and reload the file
+          _goToPage(_currentPage + 1);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Inserted a dark blank page for notes!')),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error inserting native blank page: $e");
+    }
   }
 
   @override
@@ -158,7 +264,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                                     size: 34,
                                     onPressed: _currentPage > 1
                                         ? () {
-                                            _pdfViewerController.previousPage();
+                                            _goToPage(_currentPage - 1);
                                           }
                                         : null,
                                     tooltip: 'Previous Page',
@@ -195,7 +301,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                                       onSubmitted: (value) {
                                         final page = int.tryParse(value);
                                         if (page != null && page >= 1 && page <= _totalPages) {
-                                          _pdfViewerController.jumpToPage(page);
+                                          _goToPage(page);
                                         } else {
                                           _pageInputController.text = '$_currentPage';
                                           ScaffoldMessenger.of(context).showSnackBar(
@@ -223,7 +329,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                                     size: 34,
                                     onPressed: _currentPage < _totalPages
                                         ? () {
-                                            _pdfViewerController.nextPage();
+                                            _goToPage(_currentPage + 1);
                                           }
                                         : null,
                                     tooltip: 'Next Page',
@@ -233,32 +339,79 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                             ),
                           ),
                           const SizedBox(width: 4),
-                          NeumorphicIconButton(
-                            icon: Icons.zoom_in_rounded,
-                            iconColor: AppTheme.primaryAccent,
-                            size: 36,
-                            onPressed: () {
-                              _pdfViewerController.zoomLevel = (_pdfViewerController.zoomLevel + 0.25).clamp(1.0, 3.0);
+                          PopupMenuButton<String>(
+                            offset: const Offset(0, 50),
+                            color: AppTheme.surfaceNeumorphic,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                            ),
+                            icon: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1A1D24),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: AppTheme.neumorphicShadows(),
+                              ),
+                              child: const Icon(Icons.menu_rounded, color: Colors.white, size: 20),
+                            ),
+                            onSelected: (value) {
+                              if (value == 'zoom_in') {
+                                _pdfViewerController.zoomLevel = (_pdfViewerController.zoomLevel + 0.25).clamp(1.0, 3.0);
+                              } else if (value == 'zoom_out') {
+                                _pdfViewerController.zoomLevel = (_pdfViewerController.zoomLevel - 0.25).clamp(1.0, 3.0);
+                              } else if (value == 'draw') {
+                                setState(() {
+                                  _isDrawMode = !_isDrawMode;
+                                });
+                              } else if (value == 'flag') {
+                                _showFlagPageModal(context);
+                              }
                             },
-                            tooltip: 'Zoom In',
-                          ),
-                          const SizedBox(width: 6),
-                          NeumorphicIconButton(
-                            icon: Icons.zoom_out_rounded,
-                            iconColor: AppTheme.primaryAccent,
-                            size: 36,
-                            onPressed: () {
-                              _pdfViewerController.zoomLevel = (_pdfViewerController.zoomLevel - 0.25).clamp(1.0, 3.0);
-                            },
-                            tooltip: 'Zoom Out',
-                          ),
-                          const SizedBox(width: 6),
-                          NeumorphicIconButton(
-                            icon: Icons.bookmark_add_rounded,
-                            iconColor: AppTheme.secondaryAccent,
-                            size: 36,
-                            onPressed: () => _showFlagPageModal(context),
-                            tooltip: 'Flag Page for Doubt Bank',
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'zoom_in',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.zoom_in_rounded, color: AppTheme.primaryAccent, size: 22),
+                                    const SizedBox(width: 12),
+                                    Text('Zoom In', style: TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'zoom_out',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.zoom_out_rounded, color: AppTheme.primaryAccent, size: 22),
+                                    const SizedBox(width: 12),
+                                    Text('Zoom Out', style: TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'draw',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.draw_rounded, color: _isDrawMode ? AppTheme.primaryAccent : AppTheme.textSecondary, size: 22),
+                                    const SizedBox(width: 12),
+                                    Text(_isDrawMode ? 'Disable Drawing' : 'Enable Drawing', style: TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuDivider(),
+                              PopupMenuItem(
+                                value: 'flag',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.bookmark_add_rounded, color: AppTheme.secondaryAccent, size: 22),
+                                    const SizedBox(width: 12),
+                                    Text('Flag Page for Doubt Bank', style: TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -268,89 +421,276 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   // Maximized PDF Viewport Surface
                   Expanded(
                     child: Container(
-                      margin: const EdgeInsets.fromLTRB(14, 4, 14, 12),
                       clipBehavior: Clip.antiAlias,
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
-                        boxShadow: AppTheme.glassShadow,
+                        color: AppTheme.backgroundDark,
                       ),
-                      child: _isDownloading
-                          ? Container(
-                              color: AppTheme.backgroundDark,
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    CircularProgressIndicator(color: AppTheme.primaryAccent),
-                                    SizedBox(height: 18),
-                                    Text(
-                                      'Downloading PDF from Drive... ${(_downloadProgress * 100).toInt()}%',
-                                      style: TextStyle(
-                                        color: AppTheme.textPrimary,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: _isDownloading
+                                ? Container(
+                                    color: AppTheme.backgroundDark,
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          CircularProgressIndicator(color: AppTheme.primaryAccent),
+                                          SizedBox(height: 18),
+                                          Text(
+                                            'Downloading PDF from Drive... ${(_downloadProgress * 100).toInt()}%',
+                                            style: TextStyle(
+                                              color: AppTheme.textPrimary,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          SizedBox(height: 6),
+                                          Text(
+                                            'Saving directly to your local device app folder',
+                                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    SizedBox(height: 6),
-                                    Text(
-                                      'Saving directly to your local device app folder',
-                                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                                    ),
-                                  ],
+                                  )
+                                : _hasErrorLoadingPdf
+                                    ? _buildErrorScreen()
+                                    : _hasPdfContent
+                                        ? Stack(
+                                            children: [
+                                          // Persistent PDF Viewer to retain zoom/scroll state
+                                          _isLocalFile && _downloadedLocalPath != null
+                                              ? SfPdfViewer.file(
+                                                  File(_downloadedLocalPath!),
+                                                  key: _pdfViewerKey,
+                                                  controller: _pdfViewerController,
+                                                  canShowScrollHead: false,
+                                                  pageSpacing: 0,
+                                                  enableDoubleTapZooming: !_isDrawMode,
+                                                  onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+                                                    setState(() {
+                                                      _totalPages = details.document.pages.count;
+                                                    });
+                                                  },
+                                                  onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+                                                    setState(() {
+                                                      _hasErrorLoadingPdf = true;
+                                                    });
+                                                  },
+                                                  onPageChanged: _onPdfPageChanged,
+                                                )
+                                              : _isNetworkUrl
+                                                  ? SfPdfViewer.network(
+                                                      widget.filePath!,
+                                                      key: _pdfViewerKey,
+                                                      controller: _pdfViewerController,
+                                                      canShowScrollHead: false,
+                                                      pageSpacing: 0,
+                                                      enableDoubleTapZooming: !_isDrawMode,
+                                                      onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+                                                        setState(() {
+                                                          _totalPages = details.document.pages.count;
+                                                        });
+                                                      },
+                                                      onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+                                                        setState(() {
+                                                          _hasErrorLoadingPdf = true;
+                                                        });
+                                                      },
+                                                      onPageChanged: _onPdfPageChanged,
+                                                    )
+                                                  : _buildErrorScreen(),
+                                            ],
+                                          )
+                                        : _buildErrorScreen(),
+                          ),
+                          
+                          // The Dual-Layer Inking Canvas Overlay
+                          Positioned.fill(
+                            child: InkingCanvas(
+                              engine: _drawingEngine,
+                              isDrawMode: _isDrawMode,
+                              scrollOffset: _currentScrollOffset,
+                            ),
+                          ),
+                          
+                          // Drawing Toolbar (Floating at Bottom)
+                          if (_isDrawMode)
+                            Positioned(
+                              bottom: 20,
+                              left: 0,
+                              right: 0,
+                              child: Center(
+                                child: ListenableBuilder(
+                                  listenable: _drawingEngine,
+                                  builder: (context, _) {
+                                    return GlassCard(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      borderRadius: 30,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          _buildToolButton(
+                                            icon: Icons.edit_rounded,
+                                            isActive: _drawingEngine.mode == DrawingMode.pen,
+                                            overrideActiveColor: _drawingEngine.activeColor,
+                                            onTap: () {
+                                              if (_drawingEngine.mode == DrawingMode.pen) {
+                                                _showPenConfigModal(context);
+                                              } else {
+                                                _drawingEngine.setMode(DrawingMode.pen);
+                                              }
+                                            },
+                                          ),
+                                          const SizedBox(width: 8),
+                                          _buildToolButton(
+                                            icon: Icons.cleaning_services_rounded,
+                                            isActive: _drawingEngine.mode == DrawingMode.eraser,
+                                            onTap: () => _drawingEngine.setMode(DrawingMode.eraser),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          _buildToolButton(
+                                            icon: Icons.gesture_rounded, // Lasso
+                                            isActive: _drawingEngine.mode == DrawingMode.lasso,
+                                            onTap: () => _drawingEngine.setMode(DrawingMode.lasso),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          _buildToolButton(
+                                            icon: Icons.pan_tool_rounded, // Pan Tool
+                                            isActive: _drawingEngine.mode == DrawingMode.pan,
+                                            onTap: () => _drawingEngine.setMode(DrawingMode.pan),
+                                          ),
+                                          Container(
+                                            margin: const EdgeInsets.symmetric(horizontal: 12),
+                                            height: 24,
+                                            width: 1,
+                                            color: Colors.white.withOpacity(0.2),
+                                          ),
+                                          NeumorphicIconButton(
+                                            icon: Icons.note_add_rounded,
+                                            size: 40,
+                                            iconColor: AppTheme.secondaryAccent,
+                                            onPressed: _insertBlankPage,
+                                            tooltip: 'Insert Dark Blank Page',
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
                                 ),
                               ),
-                            )
-                          : _hasErrorLoadingPdf
-                              ? _buildErrorScreen()
-                              : _hasPdfContent
-                                  ? (_isLocalFile && _downloadedLocalPath != null
-                                      ? SfPdfViewer.file(
-                                          File(_downloadedLocalPath!),
-                                          key: Key(_downloadedLocalPath!),
-                                          controller: _pdfViewerController,
-                                          onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-                                            setState(() {
-                                              _totalPages = details.document.pages.count;
-                                            });
-                                          },
-                                          onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
-                                            setState(() {
-                                              _hasErrorLoadingPdf = true;
-                                            });
-                                          },
-                                          onPageChanged: (PdfPageChangedDetails details) {
-                                            _onPageChanged(details.newPageNumber);
-                                          },
-                                        )
-                                      : _isNetworkUrl
-                                          ? SfPdfViewer.network(
-                                              widget.filePath!,
-                                              key: Key(widget.filePath!),
-                                              controller: _pdfViewerController,
-                                              onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-                                                setState(() {
-                                                  _totalPages = details.document.pages.count;
-                                                });
-                                              },
-                                              onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
-                                                setState(() {
-                                                  _hasErrorLoadingPdf = true;
-                                                });
-                                              },
-                                              onPageChanged: (PdfPageChangedDetails details) {
-                                                _onPageChanged(details.newPageNumber);
-                                              },
-                                            )
-                                          : _buildErrorScreen())
-                                  : _buildErrorScreen(),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToolButton({required IconData icon, required bool isActive, required VoidCallback onTap, Color? overrideActiveColor}) {
+    final activeColor = overrideActiveColor ?? AppTheme.primaryAccent;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: isActive ? activeColor.withOpacity(0.2) : Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: isActive ? activeColor : Colors.transparent),
+        ),
+        child: Icon(
+          icon,
+          color: isActive ? activeColor : Colors.white,
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  void _showPenConfigModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return GlassNeumorphicCard(
+              borderRadius: 28,
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Pen Settings', style: TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
+                  Text('Color', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      _buildColorSwatch(const Color(0xFFFACC15), setModalState), // Yellow
+                      _buildColorSwatch(const Color(0xFFEF4444), setModalState), // Red
+                      _buildColorSwatch(const Color(0xFF3B82F6), setModalState), // Blue
+                      _buildColorSwatch(const Color(0xFF10B981), setModalState), // Green
+                      _buildColorSwatch(Colors.white, setModalState),            // White
+                      _buildColorSwatch(const Color(0xFF94A3B8), setModalState), // Gray
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Text('Thickness', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+                  Slider(
+                    value: _drawingEngine.activeThickness,
+                    min: 1.0,
+                    max: 12.0,
+                    activeColor: _drawingEngine.activeColor,
+                    inactiveColor: Colors.white.withOpacity(0.1),
+                    onChanged: (value) {
+                      setModalState(() {
+                        _drawingEngine.setPenConfig(_drawingEngine.activeColor, value);
+                      });
+                      setState(() {});
+                    },
+                  ),
+                ],
+              ),
+            );
+          }
+        );
+      }
+    );
+  }
+
+  Widget _buildColorSwatch(Color color, StateSetter setModalState) {
+    final isSelected = _drawingEngine.activeColor == color;
+    return GestureDetector(
+      onTap: () {
+        setModalState(() {
+          _drawingEngine.setPenConfig(color, _drawingEngine.activeThickness);
+        });
+        setState(() {});
+      },
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isSelected ? Colors.white : Colors.transparent,
+            width: 3,
+          ),
+          boxShadow: [
+            if (isSelected) BoxShadow(color: color.withOpacity(0.5), blurRadius: 8, spreadRadius: 2),
+          ],
         ),
       ),
     );

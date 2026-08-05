@@ -4,11 +4,11 @@ import 'screens/splash_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const JeeDoubtTrackerApp());
+  runApp(const EduSyncApp());
 }
 
-class JeeDoubtTrackerApp extends StatelessWidget {
-  const JeeDoubtTrackerApp({Key? key}) : super(key: key);
+class EduSyncApp extends StatelessWidget {
+  const EduSyncApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +16,7 @@ class JeeDoubtTrackerApp extends StatelessWidget {
       valueListenable: AppTheme.activeThemeNotifier,
       builder: (context, mode, child) {
         return MaterialApp(
-          title: 'JEE Doubt Vault',
+          title: 'EduSync',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.darkTheme,
           home: const SplashScreen(),

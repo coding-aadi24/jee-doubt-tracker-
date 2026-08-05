@@ -14,10 +14,18 @@ class ApiConfig {
   static String get uploadToDriveUrl => '$baseUrl/api/v1/upload-to-drive';
 
   /// Helper getter for PDF download endpoint
-  static String downloadPdfUrl({String? fileName, String? driveFileId, String? chapter}) {
+  static String downloadPdfUrl({String? fileName, String? driveFileId, String? chapter, int? fileSizeBytes}) {
+    String base = '';
     if (chapter != null) {
-      return '$baseUrl/api/v1/download-pdf?chapter=${Uri.encodeComponent(chapter)}';
+      base = '$baseUrl/api/v1/download-pdf?chapter=${Uri.encodeComponent(chapter)}';
+    } else {
+      base = '$baseUrl/api/v1/download-pdf?fileName=${Uri.encodeComponent(fileName ?? '')}&driveFileId=${Uri.encodeComponent(driveFileId ?? '')}';
     }
-    return '$baseUrl/api/v1/download-pdf?fileName=${Uri.encodeComponent(fileName ?? '')}&driveFileId=${Uri.encodeComponent(driveFileId ?? '')}';
+    
+    if (fileSizeBytes != null) {
+      base += '&size=$fileSizeBytes';
+    }
+    
+    return base;
   }
 }

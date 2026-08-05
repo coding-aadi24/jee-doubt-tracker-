@@ -83,7 +83,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Choose your favorite color palette for JEE Doubt Vault:',
+                            'Choose your favorite color palette for EduSync:',
                             style: TextStyle(
                               fontSize: 12,
                               color: AppTheme.textSecondary,

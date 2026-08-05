@@ -41,9 +41,6 @@ class _UploadScreenState extends State<UploadScreen> {
   String? _selectedChapter;
   PlatformFile? _selectedFile;
 
-  // User details
-  final TextEditingController _userNameController = TextEditingController(text: 'JEE Aspirant');
-  final TextEditingController _userEmailController = TextEditingController(text: 'aspirant@jee.edu');
   final TextEditingController _serverUrlController = TextEditingController(text: ApiConfig.baseUrl);
 
   // UI state
@@ -190,8 +187,6 @@ class _UploadScreenState extends State<UploadScreen> {
   void dispose() {
     _scrollController.dispose();
     _pageNumberController.dispose();
-    _userNameController.dispose();
-    _userEmailController.dispose();
     _serverUrlController.dispose();
     super.dispose();
   }
@@ -339,6 +334,13 @@ class _UploadScreenState extends State<UploadScreen> {
       return;
     }
 
+    if (_pageNumberController.text.trim().isEmpty) {
+      setState(() {
+        _errorMessage = 'Please provide the Page Number to Extract.';
+      });
+      return;
+    }
+
     setState(() {
       _isUploading = true;
       _errorMessage = null;
@@ -352,13 +354,8 @@ class _UploadScreenState extends State<UploadScreen> {
       request.fields['className'] = _selectedClass;
       request.fields['subject'] = _selectedSubject;
       request.fields['chapter'] = _selectedChapter!;
-      request.fields['userName'] = _userNameController.text.trim();
-      request.fields['userEmail'] = _userEmailController.text.trim();
 
-      final pageText = _pageNumberController.text.trim();
-      if (pageText.isNotEmpty) {
-        request.fields['pageNumber'] = pageText;
-      }
+      request.fields['pageNumber'] = _pageNumberController.text.trim();
       if (forceAppend) {
         request.fields['forceAppend'] = 'true';
       }
@@ -534,37 +531,11 @@ class _UploadScreenState extends State<UploadScreen> {
 
                       const SizedBox(height: 16),
 
-                      // Step 2: User Information
+                      // Step 2: Choose PDF File
                       StaggeredEntrance(
                         index: 2,
                         child: _buildSectionCard(
-                          title: '2. User Information',
-                          icon: Icons.person_rounded,
-                          child: Column(
-                            children: [
-                              _buildTextField(
-                                controller: _userNameController,
-                                label: 'User Name',
-                                icon: Icons.badge_rounded,
-                              ),
-                              const SizedBox(height: 12),
-                              _buildTextField(
-                                controller: _userEmailController,
-                                label: 'User Email',
-                                icon: Icons.email_rounded,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Step 3: Choose PDF File
-                      StaggeredEntrance(
-                        index: 3,
-                        child: _buildSectionCard(
-                          title: '3. Choose PDF File',
+                          title: '2. Choose PDF File',
                           icon: Icons.picture_as_pdf_rounded,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -630,7 +601,7 @@ class _UploadScreenState extends State<UploadScreen> {
                               const SizedBox(height: 14),
                               _buildTextField(
                                 controller: _pageNumberController,
-                                label: 'Page Number to Extract (Optional)',
+                                label: 'Page Number to Extract (Required)',
                                 icon: Icons.find_in_page_rounded,
                                 keyboardType: TextInputType.number,
                               ),
@@ -644,7 +615,7 @@ class _UploadScreenState extends State<UploadScreen> {
                       // Error Banner
                       if (_errorMessage != null) ...[
                         StaggeredEntrance(
-                          index: 4,
+                          index: 3,
                           child: GlassCard(
                             borderRadius: 16,
                             padding: const EdgeInsets.all(14),
@@ -669,7 +640,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
                       // Neumorphic Upload Action Button
                       StaggeredEntrance(
-                        index: 5,
+                        index: 4,
                         child: NeumorphicButton(
                           onPressed: _isUploading ? null : _uploadFileToDriveBackend,
                           isGlowing: true,

@@ -1,6 +1,6 @@
-# JEE Doubt Tracker - Standalone Backend API
+# EduSync - Standalone Backend API
 
-Standalone Node.js + Express + TypeScript backend server for the **JEE Doubt Tracker** collaborative PDF question organizer app.
+Standalone Node.js + Express + TypeScript backend server for the **EduSync** collaborative PDF question organizer app.
 
 ## Project Structure
 
@@ -18,7 +18,7 @@ d:\rrr\
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── .env
-└── jee_doubt_tracker\          # Standalone Flutter Frontend App
+└── edu_sync\          # Standalone Flutter Frontend App
 ```
 
 ## Getting Started

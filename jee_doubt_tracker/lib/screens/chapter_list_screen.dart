@@ -170,7 +170,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
               available.add(chapterStr);
               final fName = fileName?.toString() ?? '';
               final dId = driveId?.toString() ?? '';
-              paths[chapterStr] = ApiConfig.downloadPdfUrl(fileName: fName, driveFileId: dId);
+              final sizeBytes = record['fileSizeBytes'] as int?;
+              paths[chapterStr] = ApiConfig.downloadPdfUrl(fileName: fName, driveFileId: dId, fileSizeBytes: sizeBytes);
             }
           }
         }

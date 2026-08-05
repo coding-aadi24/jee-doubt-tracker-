@@ -1,0 +1,1 @@
+const { PDFDocument } = require('pdf-lib'); const fs = require('fs'); async function create() { const doc = await PDFDocument.create(); doc.addPage(); const bytes = await doc.save(); fs.writeFileSync('valid.pdf', bytes); } create();

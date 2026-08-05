@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="40 20 640 210" width="100%" height="100%">
+  <defs>
+    <linearGradient id="orangeGradF" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF6B00"/>
+      <stop offset="100%" stop-color="#FFA800"/>
+    </linearGradient>
+    <linearGradient id="textGradF" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF7A00"/>
+      <stop offset="100%" stop-color="#FFB800"/>
+    </linearGradient>
+    <filter id="glowOrangeF" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+
+  <g transform="translate(80, 50)">
+    <path d="M 60 160 C 20 160 10 120 40 100 C 20 60 70 30 110 50 C 140 20 190 40 190 80 C 220 90 220 140 180 160 Z" fill="none" stroke="url(#orangeGradF)" stroke-width="6" stroke-dasharray="8 6" opacity="0.6"/>
+
+    <polygon points="120,40 200,80 120,120 40,80" fill="url(#orangeGradF)" filter="url(#glowOrangeF)"/>
+    <polygon points="120,55 180,80 120,105 60,80" fill="#FFFFFF" opacity="0.85"/>
+
+    <path d="M 75 100 L 75 135 C 75 155 165 155 165 135 L 165 100" fill="none" stroke="url(#orangeGradF)" stroke-width="10" stroke-linecap="round"/>
+    
+    <path d="M 180 80 L 205 120 L 205 145" fill="none" stroke="#EF4444" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="205" cy="155" r="12" fill="#EF4444" filter="url(#glowOrangeF)"/>
+    <text x="205" y="160" font-family="sans-serif" font-weight="900" font-size="12" fill="#FFFFFF" text-anchor="middle">?</text>
+
+    <circle cx="40" cy="80" r="8" fill="#FF6B00" stroke="#FFFFFF" stroke-width="2"/>
+    <circle cx="120" cy="40" r="8" fill="#FFB800" stroke="#FFFFFF" stroke-width="2"/>
+    <circle cx="200" cy="80" r="8" fill="#F43F5E" stroke="#FFFFFF" stroke-width="2"/>
+  </g>
+
+  <g transform="translate(330, 150)">
+    <text font-family="'Inter', 'Plus Jakarta Sans', sans-serif" font-weight="800" font-size="68" fill="#14161E" letter-spacing="-1">
+      Edu<tspan fill="url(#textGradF)">Sync</tspan>
+    </text>
+    <text y="38" font-family="'Inter', sans-serif" font-weight="600" font-size="16" fill="#475569" letter-spacing="3">
+      COLLABORATIVE JEE HUB
+    </text>
+  </g>
+</svg>

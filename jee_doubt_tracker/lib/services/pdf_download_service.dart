@@ -9,10 +9,10 @@ import 'package:flutter/foundation.dart';
 class PdfDownloadService {
   static Directory? _localFolder;
 
-  /// Returns or creates the local JEE Doubt Tracker app folder for PDFs.
+  /// Returns or creates the local EduSync app folder for PDFs.
   static Future<Directory> getLocalPdfFolder() async {
     if (kIsWeb) {
-      return Directory('/tmp/JEE_Doubt_Tracker_PDFs');
+      throw UnsupportedError('Local file system not supported on Web');
     }
     if (_localFolder != null && _localFolder!.existsSync()) {
       return _localFolder!;
@@ -20,7 +20,7 @@ class PdfDownloadService {
 
     try {
       final docsDir = await getApplicationDocumentsDirectory();
-      final pdfDir = Directory(path.join(docsDir.path, 'JEE_Doubt_Tracker_PDFs'));
+      final pdfDir = Directory(path.join(docsDir.path, 'EduSync_PDFs'));
 
       if (!pdfDir.existsSync()) {
         await pdfDir.create(recursive: true);
@@ -29,7 +29,7 @@ class PdfDownloadService {
       _localFolder = pdfDir;
       return pdfDir;
     } catch (_) {
-      return Directory('/tmp/JEE_Doubt_Tracker_PDFs');
+      return Directory('/tmp/EduSync_PDFs');
     }
   }
 
@@ -37,28 +37,42 @@ class PdfDownloadService {
   static Future<File> getLocalPdfFile(String fileName) async {
     final folder = await getLocalPdfFolder();
     final cleanName = fileName.replaceAll(RegExp(r'[^\w\s\-\.]'), '_');
-    final targetName = cleanName.endsWith('.pdf') ? cleanName : '$cleanName.pdf';
+    final targetName =
+        cleanName.endsWith('.pdf') ? cleanName : '$cleanName.pdf';
     return File(path.join(folder.path, targetName));
   }
 
-  /// Checks if a chapter PDF is already downloaded locally and is a valid PDF.
-  static Future<bool> isPdfDownloadedLocally(String fileName) async {
+  /// Checks if a chapter PDF is already downloaded locally, is a valid PDF, and matches the expected size (if provided).
+  static Future<bool> isPdfDownloadedLocally(String fileName, {int? expectedSizeBytes}) async {
+    if (kIsWeb) return false;
+
     try {
       final file = await getLocalPdfFile(fileName);
       if (!file.existsSync() || file.lengthSync() < 100) return false;
+      
+      // Cross-verification: If expected size is provided, and it doesn't match EXACTLY, 
+      // it means a page was added or deleted on Google Drive! We must invalidate cache!
+      if (expectedSizeBytes != null && expectedSizeBytes > 0) {
+        if (file.lengthSync() != expectedSizeBytes) {
+          print('🔄 Cache invalidated for $fileName: Local size (${file.lengthSync()}) != Drive size ($expectedSizeBytes).');
+          return false;
+        }
+      }
+      
       final bytes = await file.openRead(0, 4).first;
       return bytes.length >= 4 &&
           bytes[0] == 0x25 && // '%'
           bytes[1] == 0x50 && // 'P'
           bytes[2] == 0x44 && // 'D'
-          bytes[3] == 0x46;   // 'F'
+          bytes[3] == 0x46; // 'F'
     } catch (_) {
       return false;
     }
   }
 
   /// Generates a valid fallback binary PDF file on local disk.
-  static Future<File> _createFallbackPdfFile(File targetFile, String fileName) async {
+  static Future<File> _createFallbackPdfFile(
+      File targetFile, String fileName) async {
     final cleanTitle = fileName.replaceAll(RegExp(r'[^\w\s\-\:]'), '');
     final pdfContent = '''
 %PDF-1.4
@@ -80,7 +94,7 @@ BT
 ($cleanTitle) Tj
 /F1 14 Tf
 0 -40 Td
-(JEE Doubt Tracker - Chapter PDF Collection) Tj
+(EduSync - Chapter PDF Collection) Tj
 0 -30 Td
 (Question 1: Evaluate the given problem and determine the correct option.) Tj
 0 -25 Td
@@ -121,21 +135,43 @@ startxref
     required String fileName,
     void Function(double progress)? onProgress,
   }) async {
-    final targetFile = await getLocalPdfFile(fileName);
+    if (kIsWeb) {
+      print(
+          '🌐 Running on Web: Bypassing local file download. Using network streaming directly.');
+      return null;
+    }
 
     try {
-      // Delete old local file if present to guarantee fetching fresh new PDF from server every time
+      final targetFile = await getLocalPdfFile(fileName);
+
+      int? expectedSize;
+      final uri = Uri.tryParse(url);
+      if (uri != null && uri.queryParameters.containsKey('size')) {
+        expectedSize = int.tryParse(uri.queryParameters['size']!);
+      }
+
+      // Use cached file if it exists, is valid PDF, and perfectly matches Drive file size (if known)
+      if (await isPdfDownloadedLocally(fileName, expectedSizeBytes: expectedSize)) {
+        print('⚡ Using valid cached local PDF file: ${targetFile.path}');
+        if (onProgress != null) onProgress(1.0);
+        return targetFile;
+      }
+      
+      // If we got here, the file is either missing, corrupted, or has changed on Drive (pages added/deleted).
+      // We must delete the old obsolete file before downloading the fresh one.
       if (targetFile.existsSync()) {
         try {
           await targetFile.delete();
-          print('🗑️ Purged old cached PDF file: ${targetFile.path}');
+          print('🗑️ Purged obsolete cached PDF file: ${targetFile.path}');
         } catch (_) {}
       }
 
-      print('📥 Downloading PDF from "$url" to local path "${targetFile.path}"...');
+      print(
+          '📥 Downloading fresh PDF from "$url" to local path "${targetFile.path}"...');
 
       var finalUrl = url;
-      if (finalUrl.contains('drive.google.com') || finalUrl.contains('docs.google.com')) {
+      if (finalUrl.contains('drive.google.com') ||
+          finalUrl.contains('docs.google.com')) {
         if (!finalUrl.contains('confirm=')) {
           finalUrl += '&confirm=t';
         }
@@ -164,7 +200,8 @@ startxref
             bytes[2] == 0x44 &&
             bytes[3] == 0x46) {
           await targetFile.writeAsBytes(bytes);
-          print('✅ Downloaded & verified PDF locally! File size: ${targetFile.lengthSync()} bytes');
+          print(
+              '✅ Downloaded & verified PDF locally! File size: ${targetFile.lengthSync()} bytes');
           return targetFile;
         } else {
           print('⚠️ Server/Drive returned non-PDF content.');

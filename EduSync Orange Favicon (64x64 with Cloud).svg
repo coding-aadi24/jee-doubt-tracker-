@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="100%" height="100%">
+  <rect width="64" height="64" rx="14" fill="#1C1917"/>
+  
+  <path d="M 16 42 C 6 42 3 32 11 26 C 6 16 19 8 30 13 C 38 5 51 10 51 21 C 59 23 59 36 49 42 Z" fill="none" stroke="#FF6B00" stroke-width="1.5" stroke-dasharray="2 1.5" opacity="0.6"/>
+
+  <polygon points="32,12 52,22 32,32 12,22" fill="#FF6B00"/>
+  <polygon points="32,16 46,22 32,28 18,22" fill="#1C1917"/>
+  <path d="M 21 28 L 21 38 C 21 44 43 44 43 38 L 43 28" fill="none" stroke="#FF6B00" stroke-width="3" stroke-linecap="round"/>
+  
+  <circle cx="48" cy="42" r="5" fill="#EF4444"/>
+  <text x="48" y="44" font-family="sans-serif" font-weight="900" font-size="6" fill="#FFFFFF" text-anchor="middle">?</text>
+</svg>

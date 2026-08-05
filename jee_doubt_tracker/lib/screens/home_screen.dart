@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_theme.dart';
 import '../config/api_config.dart';
 import '../widgets/glass_neumorphic_widgets.dart';
@@ -167,49 +168,53 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppTheme.primaryAccent.withOpacity(0.2),
-                              border: Border.all(color: AppTheme.primaryAccent.withOpacity(0.4)),
-                            ),
-                            child: Icon(
-                              Icons.auto_stories_rounded,
-                              color: AppTheme.primaryAccent,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'JEE Doubt Vault',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.textPrimary,
-                                  letterSpacing: -0.2,
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppTheme.primaryAccent.withOpacity(0.4), width: 1.5),
+                                image: const DecorationImage(
+                                  image: AssetImage('assets/images/app_icon.png'),
+                                  fit: BoxFit.cover,
                                 ),
                               ),
-                              Text(
-                                'Collaborative Practice Hub',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppTheme.textSecondary,
-                                ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'EduSync',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textPrimary,
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Collaborative Practice Hub',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
                       NeumorphicIconButton(
                         icon: Icons.settings_rounded,
                         size: 38,
-                        tooltip: 'Vault Settings',
+                        tooltip: 'EduSync Settings',
                         onPressed: () {
                           Navigator.push(
                             context,
@@ -283,9 +288,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
-                                    'Open & Read Practice Material',
+                                    'Doubt Practice Material',
                                     style: TextStyle(
-                                      fontSize: 21,
+                                      fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                       color: AppTheme.textPrimary,
                                       letterSpacing: -0.5,
@@ -293,9 +298,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'Tag question numbers directly into your team doubt bank with automated cloud sync.',
+                                    'Read PDFs and tag doubt questions directly into your cloud bank.',
                                     style: TextStyle(
-                                      fontSize: 13,
+                                      fontSize: 12,
                                       color: AppTheme.textSecondary,
                                       height: 1.35,
                                     ),
@@ -309,15 +314,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                         onPressed: () => _pickAndOpenPdf(context),
                                         isGlowing: true,
                                         accentColor: AppTheme.primaryAccent,
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                                         child: const Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(Icons.picture_as_pdf, color: Colors.white, size: 18),
-                                            SizedBox(width: 8),
+                                            Icon(Icons.picture_as_pdf, color: Colors.white, size: 16),
+                                            SizedBox(width: 6),
                                             Text(
                                               'Open Local PDF',
-                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
                                             ),
                                           ],
                                         ),
@@ -342,15 +347,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                         },
                                         accentColor: AppTheme.secondaryAccent,
                                         surfaceColor: AppTheme.surfaceNeumorphic,
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(Icons.cloud_upload_rounded, color: AppTheme.secondaryAccent, size: 18),
-                                            SizedBox(width: 8),
+                                            Icon(Icons.cloud_upload_rounded, color: AppTheme.secondaryAccent, size: 16),
+                                            SizedBox(width: 6),
                                             Text(
                                               'Upload to Drive',
-                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textPrimary),
+                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.textPrimary),
                                             ),
                                           ],
                                         ),
@@ -396,7 +401,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 children: [
                                   _buildStatItem('$_totalPdfCount', 'Uploaded PDFs', AppTheme.secondaryAccent),
                                   _buildStatItem('${_subjectPdfCounts.length}', 'Active Modules', AppTheme.primaryAccent),
-                                  _buildStatItem('${_subjectCollections.length}', 'Subject Vaults', AppTheme.accentCyan),
+                                  _buildStatItem('${_subjectCollections.length}', 'Subject Collections', AppTheme.accentCyan),
                                 ],
                               ),
                             ],
@@ -470,7 +475,21 @@ class _HomeScreenState extends State<HomeScreen> {
                           })
                           .toList(),
 
-                      const SizedBox(height: 80),
+                      const SizedBox(height: 40),
+                      
+                      // Full Bleed Dark Logo at the bottom
+                      Center(
+                        child: Opacity(
+                          opacity: 0.8,
+                          child: SvgPicture.asset(
+                            'assets/images/logo_full_bleed.svg',
+                            width: MediaQuery.of(context).size.width * 0.92,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 60),
                     ],
                   ),
                 ),

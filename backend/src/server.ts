@@ -25,13 +25,13 @@ app.use('/api/v1', apiRouter);
 // Root route
 app.get('/', (req, res) => {
   res.json({
-    name: 'JEE Doubt Tracker Backend API',
+    name: 'EduSync Backend API',
     version: '1.0.0',
     documentation: '/api/v1/health',
   });
 });
 
 app.listen(config.port, () => {
-  console.log(`🚀 JEE Doubt Tracker Backend running on port ${config.port} (${config.nodeEnv})`);
+  console.log(`🚀 EduSync Backend running on port ${config.port} (${config.nodeEnv})`);
   console.log(`📁 File Storage Location: ${config.storagePath}`);
 });
